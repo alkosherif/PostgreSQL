@@ -40,88 +40,100 @@
 
 # Работа с контейнерами
 
-## Установка Docker:
-
-1. Ставим Docker
+### Установка Docker
+Выполняем команду:
+```
 curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh && rm get-docker.sh && sudo usermod -aG docker $USER && newgrp docker
+```
 
 В консоль выведется:
 
-# Executing docker install script, commit: e5543d473431b782227f8908005543bb4389b8de
-+ sh -c apt-get update -qq >/dev/null
-+ sh -c DEBIAN_FRONTEND=noninteractive apt-get install -y -qq apt-transport-https ca-certificates curl >/dev/null
-+ sh -c install -m 0755 -d /etc/apt/keyrings
-+ sh -c curl -fsSL "https://download.docker.com/linux/ubuntu/gpg" | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
-+ sh -c chmod a+r /etc/apt/keyrings/docker.gpg
-+ sh -c echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu focal stable" > /etc/apt/sources.list.d/docker.list
-+ sh -c apt-get update -qq >/dev/null
-+ sh -c DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-ce-rootless-extras docker-buildx-plugin >/dev/null
-+ sh -c docker version
-Client: Docker Engine - Community
- Version:           24.0.7
- API version:       1.43
- Go version:        go1.20.10
- Git commit:        afdd53b
- Built:             Thu Oct 26 09:08:01 2023
- OS/Arch:           linux/amd64
- Context:           default
+```
+# Executing docker install script, commit: e5543d473431b782227f8908005543bb4389b8de  
++ sh -c apt-get update -qq >/dev/null  
++ sh -c DEBIAN_FRONTEND=noninteractive apt-get install -y -qq apt-transport-https ca-certificates curl >/dev/null  
++ sh -c install -m 0755 -d /etc/apt/keyrings  
++ sh -c curl -fsSL "https://download.docker.com/linux/ubuntu/gpg" | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg  
++ sh -c chmod a+r /etc/apt/keyrings/docker.gpg  
++ sh -c echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu focal stable" > /etc/apt/sources.list.d/docker.list  
++ sh -c apt-get update -qq >/dev/null  
++ sh -c DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-ce-rootless-extras docker-buildx-plugin >/dev/null  
++ sh -c docker version  
+Client: Docker Engine - Community  
+ Version:           24.0.7  
+ API version:       1.43  
+ Go version:        go1.20.10  
+ Git commit:        afdd53b  
+ Built:             Thu Oct 26 09:08:01 2023  
+ OS/Arch:           linux/amd64  
+ Context:           default  
 
-Server: Docker Engine - Community
- Engine:
-  Version:          24.0.7
-  API version:      1.43 (minimum version 1.12)
-  Go version:       go1.20.10
-  Git commit:       311b9ff
-  Built:            Thu Oct 26 09:08:01 2023
-  OS/Arch:          linux/amd64
-  Experimental:     false
- containerd:
-  Version:          1.6.26
-  GitCommit:        3dd1e886e55dd695541fdcd67420c2888645a495
- runc:
-  Version:          1.1.10
-  GitCommit:        v1.1.10-0-g18a0cb0
- docker-init:
-  Version:          0.19.0
-  GitCommit:        de40ad0
+Server: Docker Engine - Community  
+ Engine:  
+  Version:          24.0.7  
+  API version:      1.43 (minimum version 1.12)  
+  Go version:       go1.20.10  
+  Git commit:       311b9ff  
+  Built:            Thu Oct 26 09:08:01 2023  
+  OS/Arch:          linux/amd64  
+  Experimental:     false  
+ containerd:  
+  Version:          1.6.26  
+  GitCommit:        3dd1e886e55dd695541fdcd67420c2888645a495  
+ runc:  
+  Version:          1.1.10  
+  GitCommit:        v1.1.10-0-g18a0cb0  
+ docker-init:  
+  Version:          0.19.0  
+  GitCommit:        de40ad0  
 
-================================================================================
+================================================================================  
 
-To run Docker as a non-privileged user, consider setting up the
-Docker daemon in rootless mode for your user:
+To run Docker as a non-privileged user, consider setting up the  
+Docker daemon in rootless mode for your user:  
 
-    dockerd-rootless-setuptool.sh install
+    dockerd-rootless-setuptool.sh install  
 
-Visit https://docs.docker.com/go/rootless/ to learn about rootless mode.
-
-
-To run the Docker daemon as a fully privileged service, but granting non-root
-users access, refer to https://docs.docker.com/go/daemon-access/
-
-WARNING: Access to the remote API on a privileged Docker daemon is equivalent
-         to root access on the host. Refer to the 'Docker daemon attack surface'
-         documentation for details: https://docs.docker.com/go/attack-surface/
-
-================================================================================
+Visit https://docs.docker.com/go/rootless/ to learn about rootless mode.  
 
 
+To run the Docker daemon as a fully privileged service, but granting non-root  
+users access, refer to https://docs.docker.com/go/daemon-access/  
 
+WARNING: Access to the remote API on a privileged Docker daemon is equivalent  
+         to root access on the host. Refer to the 'Docker daemon attack surface'  
+         documentation for details: https://docs.docker.com/go/attack-surface/  
 
-2. Создаем docker-сеть для взаимодействия с контейнером:
+================================================================================  
+```
+
+### Создание docker-сети для взаимодействия с контейнером
+Выполняем команду:
+```
 sudo docker network create pg-net
+```
+
 В консоли выведется что-то вроде:
+```
 94a3308146ee5845d517a4cd37aab6126cf7fc209c7b2dda6e7445b9387fbcb0
-3. Подключаем созданную сеть к контейнеру *сервера* Postgres:
+```
+
+### Подключение созданной сети к контейнеру *сервера* Postgres
+Выполняем команду:
+```
 sudo docker run --name pg-server --network pg-net -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v /var/lib/postgres:/var/lib/postgresql/data postgres:15
+```
+
 Здесь:
-"-name pg-server" задаёт название контейнера
-"--network pg-net" указывает, что нужно использовать ранее созданную сеть "pg-net"
-"POSTGRES_PASSWORD=postgres" задаёт пароль "postgres" для подключения
-"-p 5432:5432" задаёт порты хоста и контейнера соответственно
-"-v /var/lib/postgres:/var/lib/postgresql/data" виртуализирует хостовую директорию ВМ, которая будет использоваться для хранения данных контейнера
-"postgres:15" задаёт версию postgres
+* "-name pg-server" задаёт название контейнера
+* "--network pg-net" указывает, что нужно использовать ранее созданную сеть "pg-net"
+* "POSTGRES_PASSWORD=postgres" задаёт пароль "postgres" для подключения
+* "-p 5432:5432" задаёт порты хоста и контейнера соответственно
+* "-v /var/lib/postgres:/var/lib/postgresql/data" виртуализирует хостовую директорию ВМ, которая будет использоваться для хранения данных контейнера
+* "postgres:15" задаёт версию postgres
 
 В консоли выведется:
+```
 Unable to find image 'postgres:15' locally
 15: Pulling from library/postgres
 af107e978371: Pull complete
@@ -141,40 +153,84 @@ f685b32afa11: Pull complete
 Digest: sha256:7415b9cc4d7f50194a4b7b2314ff2be0e6bcba82ebfd478991c2d846d2b8af78
 Status: Downloaded newer image for postgres:15
 023316193f6fb55295e3dfd05ef444eae0911eb7e5d323dd1521968e535a0c45
+```
 
-4. Запускаем отдельный контейнер с *клиентом* в сети pg-net с БД: 
+### Запуск контейнера с *клиентом* в сети pg-net с БД
+
+Выполняем команду:
+```
 sudo docker run -it --rm --network pg-net --name pg-client postgres:15 psql -h pg-server -U postgres
-5. Вводим пароль "postgres", указанный в пункте 3
+```
 
-Теперь можно вводить команды postgres:
+Вводим пароль "postgres", указанный ранее.
 
-1. Создаём БД:
+**Теперь можно вводить команды PostgreSQL.**
+
+## Работа с PostgreSQL
+
+### Создание и заполнение БД
+Выполняем команду:
+```SQL
 create database otus;
+```
+
+В консоли выведется:
+```
 CREATE DATABASE
+```
 
+Добавим таблицу:
+
+```SQL
 create table testData (id int, data varchar(100));
+```
+
+В консоли выведется:
+```
 CREATE TABLE
+```
 
-postgres=# insert into testData (data) values ('test1'),('test2');
+Добавим две строки в созданную таблицу:
+```SQL
+insert into testData (data) values ('test1'),('test2');
+```
+
+В консоли выведется:
+```
 INSERT 0 2
+```
 
-postgres=# select * from testData;
+Проверим, что данные добавились:
+```SQL
+select * from testData;
+```
+
+В консоли видим таблицу:
+```
  id | data
 ----+-------
     | test1
     | test2
 (2 rows)
+```
 
-2. Вводим команду \l и в выведенной таблице ищем название созданной БД, чтобы убедиться, что она создалась
-3. Выходим командой \q
-4. Проверяем, что подключились через отдельный контейнер:
+Вводим команду \l и в выведенной таблице ищем название созданной БД, чтобы убедиться, что она создалась.
+Выходим командой \q.
 
+### Проверка, что выполнялось подключение через отдельный контейнер:
+
+Выполняем команду:
+```
 sudo docker ps -a
+```
 
+В консоли видим:
+```
 CONTAINER ID   IMAGE         COMMAND                  CREATED          STATUS          PORTS                                       NAMES
 023316193f6f   postgres:15   "docker-entrypoint.s…"   19 minutes ago   Up 19 minutes   0.0.0.0:5432->5432/tcp, :::5432->5432/tcp   pg-server
+```
 
-__________________________________________________________________________________
+## Подключение с домашнего компьютера
 
 Попробуем подключиться к контейнеру с домашнего ПК с помощью WSL в Windows:
 
