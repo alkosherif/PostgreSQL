@@ -230,16 +230,18 @@ CONTAINER ID   IMAGE         COMMAND                  CREATED          STATUS   
 023316193f6f   postgres:15   "docker-entrypoint.s…"   19 minutes ago   Up 19 minutes   0.0.0.0:5432->5432/tcp, :::5432->5432/tcp   pg-server
 ```
 
-## Подключение с домашнего компьютера
+# Подключение с домашнего компьютера
 
 Попробуем подключиться к контейнеру с домашнего ПК с помощью WSL в Windows:
 
-1. Открываем командную строку (cmd.exe)
-2. Вводим команду:
-   bash
+Открываем командную строку (cmd.exe).  
+Вводим команду:
+```
+bash
+```
    
 В консоли выведется приветственная информация и появится возможность ввода команд linux:
-   
+```
 To run a command as administrator (user "root"), use "sudo <command>".
 See "man sudo_root" for details.
 
@@ -252,23 +254,28 @@ Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.133.1-microsoft-standard-WSL2 x86_
 
 This message is shown once a day. To disable it please create the
 /home/username/.hushlogin file.
+```
    
-3. Подключаемся к PostgreSQL используя публичный IP, записанный ранее: 
+Подключаемся к PostgreSQL используя публичный IP, записанный ранее: 
 
+```
 psql -p 5432 -U postgres -h 158.160.142.17 -d postgres -W
+```
 
-Получаем ошибку:
-
+**Получаем ошибку:**
+```
 Command 'psql' not found, but can be installed with:
 sudo apt install postgresql-client-common
+```
 
-4. Пробуем выполнить команду, полученную в информации об ошибке:
-
+Пробуем выполнить команду, полученную в информации об ошибке:
+```
 sudo apt install postgresql-client-common
-
+```
 Вводим пароль по требованию.
 В консоль выведется:
 
+```
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -285,21 +292,26 @@ Preparing to unpack .../postgresql-client-common_238_all.deb ...
 Unpacking postgresql-client-common (238) ...
 Setting up postgresql-client-common (238) ...
 Processing triggers for man-db (2.10.2-1) ...
+```
 
-5. Снова пробуем подключиться к контейнеру:
+Снова пробуем подключиться к контейнеру:
 
+```
 psql -p 5432 -U postgres -h 158.160.142.17 -d postgres -W
+```
 
-На этот раз в консоль выведется другая ошибка:
-
+**На этот раз в консоль выведется другая ошибка:**
+```
 Error: You must install at least one postgresql-client-<version> package
+```
 
-6. Устанавливаем клиент PostgreSQL:
-
+Устанавливаем клиент PostgreSQL:
+```
 sudo apt-get install postgresql-client
+```
 
 В консоль выведется:
-
+```
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -313,9 +325,9 @@ The following NEW packages will be installed:
 Need to get 1366 kB of archives.
 After this operation, 4397 kB of additional disk space will be used.
 Do you want to continue? [Y/n]
-
-7. Вводим Y и продолжаем:
-
+```
+Вводим Y и продолжаем:
+```
 Ign:1 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpq5 amd64 14.9-0ubuntu0.22.04.1
 Ign:2 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 postgresql-client-14 amd64 14.9-0ubuntu0.22.04.1
 Get:3 http://archive.ubuntu.com/ubuntu jammy/main amd64 postgresql-client all 14+238 [3292 B]
@@ -327,12 +339,16 @@ Fetched 3292 B in 1s (4301 B/s)
 E: Failed to fetch http://security.ubuntu.com/ubuntu/pool/main/p/postgresql-14/libpq5_14.9-0ubuntu0.22.04.1_amd64.deb  404  Not Found [IP: 185.125.190.39 80]
 E: Failed to fetch http://security.ubuntu.com/ubuntu/pool/main/p/postgresql-14/postgresql-client-14_14.9-0ubuntu0.22.04.1_amd64.deb  404  Not Found [IP: 185.125.190.39 80]
 E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?
+```
+**Как видно, установка не удалась.**
 
-Как видно, установка не удалась
-
-8. Пробуем обновить список репозиториев:
+Пробуем обновить список репозиториев:
+```
 sudo apt upgrade
+```
 
+В консоли выведется:
+```
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -524,13 +540,15 @@ Processing triggers for libc-bin (2.35-0ubuntu3.5) ...
 /sbin/ldconfig.real: /usr/lib/wsl/lib/libcuda.so.1 is not a symbolic link
 
 Processing triggers for man-db (2.10.2-1) ...
+```
 
-9. Снова пробуем установить клиент PostgreSQL:
-
+Снова пробуем установить клиент PostgreSQL:
+```
 sudo apt-get install postgresql-client
+```
 
-Теперь клиент 14й версии будет успешно установлен:
-
+**Теперь клиент 14й версии будет успешно установлен:**
+```
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -563,75 +581,95 @@ update-alternatives: using /usr/share/postgresql/14/man/man1/psql.1.gz to provid
 Setting up postgresql-client (14+238) ...
 Processing triggers for libc-bin (2.35-0ubuntu3.5) ...
 /sbin/ldconfig.real: /usr/lib/wsl/lib/libcuda.so.1 is not a symbolic link
+```
 
-10. Пробуем снова:
-
+Пробуем снова подключиться к БД:
+```
 psql -p 5432 -U postgres -h 158.160.142.17 -d postgres -W
-
+```
 Вводим пароль и теперь можно вводить команды:
-
+```
 psql (14.10 (Ubuntu 14.10-0ubuntu0.22.04.1), server 15.5 (Debian 15.5-1.pgdg120+1))
 WARNING: psql major version 14, server major version 15.
          Some psql features might not work.
 Type "help" for help.
 
 postgres=#
+```
+Посмотрим данные в таблице:
+```SQL
+select * from testData;
+```
 
-11. Посмотрим данные в таблице:
-
-postgres=# select * from testData;
+```
  id | data
 ----+-------
     | test1
     | test2
 (2 rows)
+```
 
-12. Переходим в putty и выполняем команды для остановки и удаления контейнера:
-
-12.1: Получим идентификатор контейнера:
-
+Переходим в putty и выполняем команды пересоздания контейнера:  
+1. Получим идентификатор контейнера:
+```
 docker ps
-
+```
 В консоль выведется:
-
+```
 CONTAINER ID   IMAGE         COMMAND                  CREATED          STATUS                                                                         PORTS                                       NAMES
 cc81fd1086ed   postgres:15   "docker-entrypoint.s…"   48 minutes ago   Up 48 min                                                               utes   0.0.0.0:5432->5432/tcp, :::5432->5432/tcp   pg-server
-
-12.2 Остановим контейнер:
-
+```
+2. Остановим контейнер:
+```
 docker stop cc81fd1086ed
-
+```  
 В консоль выведется:
+```
 cc81fd1086ed
-
-12.3 Удалим контейнер:
+```
+3. Удалим контейнер:
+```
 docker rm cc81fd1086ed
-
+```
 В консоль выведется:
+```
 cc81fd1086ed
-
-13. Создим контейнер с сервером заново
+```
+4. Создим контейнер с сервером заново
+```
 sudo docker run --name pg-server --network pg-net -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v /var/lib/postgres:/var/lib/postgresql/data postgres:15
-
+```
 В консоль выведется:
+```
 44d4d00f35d4a1f85f3bb946727d47a607ecb09ec75ba40d95f7101a91132d2d
+```
 
-14. Подключаемся снова к PostgreSQL из контейнера с клиентом:
+Подключаемся снова к PostgreSQL из контейнера с клиентом:
+```
 sudo docker run -it --rm --network pg-net --name pg-client postgres:15 psql -h pg-server -U postgres
+```
+В консоль выведется:
+```
 Password for user postgres: [вводим пароль]
 psql (15.5 (Debian 15.5-1.pgdg120+1))
 Type "help" for help.
 
 postgres=# 
+```
 
-15. Проверяем, что даннные остались на месте:
-postgres=# select * from testData;
+Проверяем, что даннные остались на месте:
+```SQL
+select * from testData;
+```
+В консоли видим таблицу, созданную ранее:
+```
  id | data
 ----+-------
     | test1
     | test2
 (2 rows)
+```
 
+# Результат
 
 В результате видим, что не смотря на удаление контейнера данные в БД не были удалены. При повторном создании контейнера с теми же параметрами в базе будут все данные, имевшиеся на момент удаления предыдущего контейнера.
-
