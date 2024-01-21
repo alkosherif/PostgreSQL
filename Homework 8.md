@@ -262,7 +262,7 @@ sudo tail -n 10 /var/log/postgresql/postgresql-15-main.log
 
 ### Создание таблицы
 
-Начнём сессию 1.
+**Сессия 1.**
 
 Создадим таблицу с первичным ключом.
 ```sql
@@ -281,26 +281,41 @@ INSERT INTO accounts VALUES (1,1000.00), (2,2000.00),(3,3000.00);
 SELECT * FROM accounts;
 ```
 
-Откроем сессию 2.
-Откроем в ней транзакцию и посмотрим её идентификатор:
+```
+ acc_no | amount
+--------+---------
+      1 | 1000.00
+      2 | 2000.00
+      3 | 3000.00
+(3 rows)
+```
+
+### Моделирование ситуации
+
+Откроем транзакции в трёх разных сессиями PostgreSQL и посмотрим их идентификаторы:
 
 ```sql
 BEGIN;
 SELECT pg_backend_pid();
 ```
 
-В консоли увидим идентификатор **12831**:
+В каждой консоли увидим свой идентификатор:
 ```
  pg_backend_pid
 ----------------
-          12831
+          12780
 (1 row)
 ```
 
-Посмотрим, какие блокировки удерживает только что начавшаяся транзакция, через pg_locks, подставив идентификатор в запрос:
+Сессия 1: 12780
+Сессия 2: 12831
+Сессия 3: 12928
+
+
+Посмотрим в **сессии 1**, какие блокировки удерживает только что начавшаяся транзакция, через pg_locks, подставив идентификатор в запрос:
 
 ```sql
-SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12831;
+SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12780;
 ```
 
 В консоли видим:
@@ -308,21 +323,21 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
   locktype  | relation | virtxid | xid |      mode       | granted
 ------------+----------+---------+-----+-----------------+---------
  relation   | pg_locks |         |     | AccessShareLock | t
- virtualxid |          | 4/185   |     | ExclusiveLock   | t
+ virtualxid |          | 3/68    |     | ExclusiveLock   | t
 (2 rows)
 ```
 
 Транзакция удерживает эксклюзивную блокировку (ExclusiveLock) своего номера (locktype = virtualxid).  
 А также лёгкую блокировку (AccessShareLock) отношения pg_locks, к которому мы только что обращались.
 
-Попробуем обновить строку таблицы в сессии 2:
+Попробуем обновить строку таблицы в **сессии 1**:
 ```sql
 UPDATE accounts SET amount = amount + 100 where acc_no = 1;
 ```
 
 Смотрим снова список блокировок:
 ```sql
-SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12831;
+SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12780;
 ```
 
 Видим уже знакомые блокировки виртуального номера транзакции (ExclusiveLock virtualxid) и отношения (AccessShareLock relation pg_locks).  
@@ -336,8 +351,53 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
  relation      | accounts_pkey |         |     | RowExclusiveLock | t
  relation      | accounts      |         |     | RowExclusiveLock | t
  relation      | pg_locks      |         |     | AccessShareLock  | t
- virtualxid    |               | 4/185   |     | ExclusiveLock    | t
- transactionid |               |         | 744 | ExclusiveLock    | t
+ virtualxid    |               | 3/68    |     | ExclusiveLock    | t
+ transactionid |               |         | 749 | ExclusiveLock    | t
 (5 rows)
 ```
 
+Теперь выполним ту же команду обновления в **сессии 2**:
+```sql
+UPDATE accounts SET amount = amount + 100 where acc_no = 1;
+```
+Она зависнет, т.к. ожидает блокировки.
+При запросе таблицы блокировок в **сессии 1** увидим, что ничего не изменилось.
+Посмотрим, на таблицу блокировок для **сессии 2** в **сессии 1**, передав идентификатор **12831 сессии 2**:
+```sql
+SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12831;
+```
+
+Видим в консоли:
+```
+   locktype    |   relation    | virtxid | xid |       mode       | granted
+---------------+---------------+---------+-----+------------------+---------
+ relation      | accounts_pkey |         |     | RowExclusiveLock | t
+ relation      | accounts      |         |     | RowExclusiveLock | t
+ virtualxid    |               | 4/186   |     | ExclusiveLock    | t
+ transactionid |               |         | 749 | ShareLock        | f
+ tuple         | accounts      |         |     | ExclusiveLock    | t
+ transactionid |               |         | 750 | ExclusiveLock    | t
+(6 rows)
+```
+
+Наконец, выполним ту же команду обновления в **сессии 3**:
+```sql
+UPDATE accounts SET amount = amount + 100 where acc_no = 1;
+```
+Она также зависнет, т.к. ожидает блокировки.
+Посмотрим, на таблицу блокировок для **сессии 3** в **сессии 1**, передав идентификатор **12928 сессии 3**:
+```sql
+SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12928;
+```
+
+В консоли видим:
+```
+   locktype    |   relation    | virtxid | xid |       mode       | granted
+---------------+---------------+---------+-----+------------------+---------
+ relation      | accounts_pkey |         |     | RowExclusiveLock | t
+ relation      | accounts      |         |     | RowExclusiveLock | t
+ virtualxid    |               | 5/71    |     | ExclusiveLock    | t
+ transactionid |               |         | 751 | ExclusiveLock    | t
+ tuple         | accounts      |         |     | ExclusiveLock    | f
+(5 rows)
+```
