@@ -259,3 +259,85 @@ sudo tail -n 10 /var/log/postgresql/postgresql-15-main.log
 
 ### Задача
 Смоделировать ситуацию обновления одной и той же строки тремя командами UPDATE в разных сеансах. Изучить возникшие блокировки в представлении pg_locks и убедиться, что все они понятны. Прислать список блокировок и объяснить, что значит каждая.
+
+### Создание таблицы
+
+Начнём сессию 1.
+
+Создадим таблицу с первичным ключом.
+```sql
+CREATE TABLE accounts(
+  acc_no integer PRIMARY KEY,
+  amount numeric
+);
+```
+
+Добавим данные:
+```sql
+INSERT INTO accounts VALUES (1,1000.00), (2,2000.00),(3,3000.00);
+```
+Проверим, что данные добавлены:
+```sql
+SELECT * FROM accounts;
+```
+
+Откроем сессию 2.
+Откроем в ней транзакцию и посмотрим её идентификатор:
+
+```sql
+BEGIN;
+SELECT pg_backend_pid();
+```
+
+В консоли увидим идентификатор **12831**:
+```
+ pg_backend_pid
+----------------
+          12831
+(1 row)
+```
+
+Посмотрим, какие блокировки удерживает только что начавшаяся транзакция, через pg_locks, подставив идентификатор в запрос:
+
+```sql
+SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12831;
+```
+
+В консоли видим:
+```
+  locktype  | relation | virtxid | xid |      mode       | granted
+------------+----------+---------+-----+-----------------+---------
+ relation   | pg_locks |         |     | AccessShareLock | t
+ virtualxid |          | 4/185   |     | ExclusiveLock   | t
+(2 rows)
+```
+
+Транзакция удерживает эксклюзивную блокировку (ExclusiveLock) своего номера (locktype = virtualxid).  
+А также лёгкую блокировку (AccessShareLock) отношения pg_locks, к которому мы только что обращались.
+
+Попробуем обновить строку таблицы в сессии 2:
+```sql
+UPDATE accounts SET amount = amount + 100 where acc_no = 1;
+```
+
+Смотрим снова список блокировок:
+```sql
+SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid, mode, granted FROM pg_locks WHERE pid = 12831;
+```
+
+Видим уже знакомые блокировки виртуального номера транзакции (ExclusiveLock virtualxid) и отношения (AccessShareLock relation pg_locks).  
+Также, видим построчную блокировку на ключ (RowExclusiveLock relation accounts_pkey).
+Кроме того, видим блокировку строки accounts (RowExclusiveLock relation accounts).
+И, наконец, видим эксклюзивную блокировку номера транзакции (ExclusiveLock).
+
+```
+   locktype    |   relation    | virtxid | xid |       mode       | granted
+---------------+---------------+---------+-----+------------------+---------
+ relation      | accounts_pkey |         |     | RowExclusiveLock | t
+ relation      | accounts      |         |     | RowExclusiveLock | t
+ relation      | pg_locks      |         |     | AccessShareLock  | t
+ virtualxid    |               | 4/185   |     | ExclusiveLock    | t
+ transactionid |               |         | 744 | ExclusiveLock    | t
+(5 rows)
+```
+
