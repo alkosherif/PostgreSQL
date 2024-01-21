@@ -168,9 +168,23 @@ SELECT * FROM testData;
 (2 rows)
 ```
 
-Теперь откроем дополнительную сессию с PostgreSQL.
+Теперь откроем дополнительную сессию с PostgreSQL.  
+Запросим идентификатор процесса, он пригодится в дальнейшем:
+```sql
+select pg_backend_pid();
+```
 
-В сессии 1 запускаем транзакцию на обновление одной из строк:
+В консоли выведется:
+```
+ pg_backend_pid
+----------------
+          12605
+(1 row)
+```
+
+Запоминаем число **12605**.
+
+Теперь в сессии 1 запускаем транзакцию на обновление одной из строк:
 
 ```sql
 BEGIN;
@@ -195,46 +209,47 @@ UPDATE testData SET data = 'test4' where data = 'test1';
 BEGIN
 ```
 
-То есть, операция в сесси 2 заблокирована и ждёт завершения первой транзакции.
+**То есть, операция в сессии 2 заблокирована и ждёт завершения первой транзакции.**
 
-Подождём секунду и завершим первую транзакцию:
+Завершим первую транзакцию:
 ```sql
-SELECT pg_sleep(1);
 COMMIT;
 ```
 
-Во второй сесии при этом вывелось:
+В сессии 2 при этом вывелось:
 ```sql
 UPDATE 0
 ```
 
-Коммитим её тоже:
+Коммитим также транзакцию сессии 2 и выходим в bash:
 ```sql
 COMMIT;
+\q
 ```
 
-Теперь подключаемся в ещё одном окне к ВМ и проверяем, есть ли блокировки:
+Теперь проверяем в сессии 2, есть ли блокировки:
 ```
 sudo tail -n 10 /var/log/postgresql/postgresql-15-main.log
 ```
 
 Видим в консоли:
 ```
-2024-01-15 21:12:06.694 UTC [4719] LOG:  checkpoint complete: wrote 950 buffers (5.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=94.796 s, sync=0.002 s, total=94.804 s; sync files=319, longest=0.002 s, average=0.001 s; distance=4314 kB, estimate=4314 kB
-2024-01-15 21:12:23.100 UTC [6540] postgres@postgres LOG:  process 6540 still waiting for ShareLock on transaction 738 after 200.058 ms
-2024-01-15 21:12:23.100 UTC [6540] postgres@postgres DETAIL:  Process holding the lock: 6534. Wait queue: 6540.
-2024-01-15 21:12:23.100 UTC [6540] postgres@postgres CONTEXT:  while updating tuple (0,1) in relation "testdata"
-2024-01-15 21:12:23.100 UTC [6540] postgres@postgres STATEMENT:  UPDATE testData SET data = 'test4' where data = 'test1';
-2024-01-15 21:17:05.525 UTC [6540] postgres@postgres LOG:  process 6540 acquired ShareLock on transaction 738 after 282625.031 ms
-2024-01-15 21:17:05.525 UTC [6540] postgres@postgres CONTEXT:  while updating tuple (0,1) in relation "testdata"
-2024-01-15 21:17:05.525 UTC [6540] postgres@postgres STATEMENT:  UPDATE testData SET data = 'test4' where data = 'test1';
-2024-01-15 21:20:31.890 UTC [4719] LOG:  checkpoint starting: time
-2024-01-15 21:20:32.001 UTC [4719] LOG:  checkpoint complete: wrote 2 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.102 s, sync=0.003 s, total=0.112 s; sync files=2, longest=0.002 s, average=0.002 s; distance=0 kB, estimate=3883 kB
+2024-01-21 20:46:23.109 UTC [12605] postgres@postgres ERROR:  function pg_backend_id() does not exist at character 8
+2024-01-21 20:46:23.109 UTC [12605] postgres@postgres HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2024-01-21 20:46:23.109 UTC [12605] postgres@postgres STATEMENT:  select pg_backend_id();
+2024-01-21 20:48:35.367 UTC [12605] postgres@postgres LOG:  process 12605 still waiting for ShareLock on transaction 738 after 200.058 ms
+2024-01-21 20:48:35.367 UTC [12605] postgres@postgres DETAIL:  Process holding the lock: 12381. Wait queue: 12605.
+2024-01-21 20:48:35.367 UTC [12605] postgres@postgres CONTEXT:  while updating tuple (0,1) in relation "testdata"
+2024-01-21 20:48:35.367 UTC [12605] postgres@postgres STATEMENT:  update testData set data = 'test4' where data = 'test1';
+2024-01-21 20:48:56.998 UTC [12605] postgres@postgres LOG:  process 12605 acquired ShareLock on transaction 738 after 21831.039 ms
+2024-01-21 20:48:56.998 UTC [12605] postgres@postgres CONTEXT:  while updating tuple (0,1) in relation "testdata"
+2024-01-21 20:48:56.998 UTC [12605] postgres@postgres STATEMENT:  update testData set data = 'test4' where data = 'test1';
 ```
 
-Нас интересует строка:
+Нас интересуют строки:
 ```
-postgres@postgres LOG:  process 6540 acquired ShareLock on transaction 738 after 282625.031 ms
+2024-01-21 20:48:35.367 UTC [12605] postgres@postgres LOG:  process 12605 still waiting for ShareLock on transaction 738 after 200.058 ms
+2024-01-21 20:48:56.998 UTC [12605] postgres@postgres LOG:  process 12605 acquired ShareLock on transaction 738 after 21831.039 ms
 ```
 
-На её месте должно быть Access process 6540 still waiting for...
+В логах видим, что ожидание блокировки длилось более 200 мс и завершилось после 21 секунды ожидания.
