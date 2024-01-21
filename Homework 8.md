@@ -338,9 +338,8 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
 ```
 
 Видим уже знакомые блокировки виртуального номера транзакции (ExclusiveLock virtualxid) и отношения (AccessShareLock relation pg_locks).  
-Также, видим построчную блокировку на ключ (RowExclusiveLock relation accounts_pkey).  
-Кроме того, видим блокировку строки accounts (RowExclusiveLock relation accounts).  
-И, наконец, видим эксклюзивную блокировку номера транзакции (ExclusiveLock).  
+Также, видим построчные блокировки RowExclusiveLock ключа (accounts_pkey) и строки (accounts), т.к. в изменяем строку в данный момент.  
+И, наконец, видим эксклюзивную блокировку номера транзакции (ExclusiveLock), т.к. транзакция ещё выполняется.  
 
 ```
    locktype    |   relation    | virtxid | xid |       mode       | granted
@@ -353,7 +352,7 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
 (5 rows)
 ```
 
-Обращаем внимание на строку с transactionid и значением **749**, оно пригодится в дальнейшем.
+Обращаем внимание на строку с transactionid и значением **749**, этот идентификатор пригодится в дальнейшем.
 
 Теперь выполним ту же команду обновления в **сессии 2**:
 ```sql
@@ -386,9 +385,8 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
 
 **Отличия**:  
 1. В таблице для **сессии 2** отсутствует блокировка отношения AccessShareLock relation pg_locks, так как запрос pg_locks выполняется в **сессии 1**, а не в **сессии 2**;  
-2. В **сессии 2** ожидается ShareLock транзакции **сессии 1** с номером **749**, т.к. транзакция не завершена;
-3. ExclusiveLock на tuple accounts.
-
+2. В **сессии 2** ожидается ShareLock транзакции **сессии 1** с номером **749**, т.к. транзакция **сессии 1**  не завершена;
+3. Добавился ExclusiveLock на tuple accounts, т.к. транзакция засыпает и ожидает ShareLock **транзакции 1**, а последующие транзакции, изменяющие ту же строку, будут ссылаться не на **транзакцию 2**, а на её tuple.
 
 Наконец, выполним ту же команду обновления в **сессии 3**:
 ```sql
@@ -411,3 +409,5 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
  tuple         | accounts      |         |     | ExclusiveLock    | f
 (5 rows)
 ```
+
+В отличие от блокировок **сессии 2**, в таблице для **сессии 3** отсутствует ShareLock transactionid 750, так как вместо ссылки на идентификатор транзакции используется ссылка на tuple для ожидания завершения транзакции **сессии 2**. Если открыть ещё одну сессию, таблица блокировок в ней будет выглядеть также (поменяются только идентификаторы текущей транзакции).
