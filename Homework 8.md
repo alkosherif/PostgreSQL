@@ -2,9 +2,47 @@
 
 ## Подготовка
 
-Создаём ВМ в Yandex.Cloud, запоминаем внешний IP 158.160.135.248, заходим через Putty.
+### Создание ВМ
 
-Устанавливаем Postgres:
+1. Заходим в Yandex.Cloud
+2. Выбираем Все сервисы > Compute Cloud > Создать ВМ
+3. Создаём сеть:  
+3.1. В поле Каталог указываем "default"  
+3.2. В поле "Имя" "otus-vm-db-pg-net-1"  
+3.3. Выбираем "Создать подсети"  
+3.4. Нажимаем "Создать"  
+4. Заполняем имя ВМ "otus-db-pg-vm-1"
+5. В поле "Зона доступности" указываем "ru-central1-d"
+6. В разделе "Операционные системы" выбираем "Ubuntu 20.04"
+7. В поле "RAM" ставим "4 ГБ"
+8. В поле "Логин" указываем **otus**  
+9. В поле "SSH-ключ" указываем публичный ключ:  
+9.1. Если не генерировали SSH-ключ ранее:
+9.1.1. Заходим в PuttyGen  
+9.1.2. Нажимаем "Generate"  
+9.1.3. Генерируем ключи, двигая мышкой по пустой области  
+9.1.4. Сохраняем публичный и приватный ключи в отдельную папку  
+9.1.5. Копируем текст из поля Key (Public key for pasting into Open SSH authorized_keys file)  
+9.1.6. Вставляем в поле "SSH-ключ"  
+9.2. Если уже есть сгенерированный ключ:
+9.2.1. Правый клик по файлу *.ppk > Edit with PuTTYGen
+9.2.2. Копируем текст из поля Key (Public key for pasting into Open SSH authorized_keys file) 
+9.2.3. Вставляем в поле "SSH-ключ"  
+10. Проставляем галочку "Разрешить доступ к серийной консоли"
+11. Нажимаем "Создать ВМ"
+12. В открывшемся окне ждём завершения создания ВМ и **сохраняем публичный IPv4 (158.160.138.140)**
+
+### Подключение к ВМ через Putty
+
+1. Открываем Putty
+2. В поле Host Name указываем внешний IPv4, полученный при создании ВМ (в пункте 12)
+3. Нажимаем Open
+4. В появившемся окне выбираем Accept
+5. На запрос логина вводим логин, указанный при создании ВМ (в пункте 8)  
+  
+Теперь можно выполнять команды.
+
+### Устанавливаем Postgres:
 ```
 sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt -y install postgresql-15
 ```
@@ -20,7 +58,7 @@ Ver Cluster Port Status Owner    Data directory              Log file
 15  main    5432 online postgres /var/lib/postgresql/15/main /var/log/postgresql/postgresql-15-main.log
 ```
 
-Подключаемся к PostgreSQL:
+**Подключаемся к PostgreSQL**:
 ```
 sudo -u postgres psql
 ```
