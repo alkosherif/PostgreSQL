@@ -436,7 +436,7 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
 Шаг 1. Сессия 1:
 ```sql
 BEGIN;
-UPDATE accounts SET amount = amount + 100 where acc_no = 1;
+UPDATE accounts SET amount = amount * 2 where acc_no = 1;
 ```
 
 В консоли выведется:
@@ -448,7 +448,7 @@ UPDATE 1
 Шаг 2. Сессия 2:
 ```sql
 BEGIN;
-UPDATE accounts SET amount = amount + 100 where acc_no = 2;
+UPDATE accounts SET amount = amount * 2 where acc_no = 2;
 ```
 
 В консоли выведется:
@@ -460,7 +460,7 @@ UPDATE 1
 Шаг 3. Сессия 3:
 ```sql
 BEGIN;
-UPDATE accounts SET amount = amount + 100 where acc_no = 3;
+UPDATE accounts SET amount = amount * 2 where acc_no = 3;
 ```
 
 В консоли выведется:
@@ -471,31 +471,75 @@ UPDATE 1
 
 Шаг 4. Сессия 1:
 ```sql
-UPDATE accounts SET amount = amount + 100 where acc_no = 3;
+UPDATE accounts SET amount = amount * 2 where acc_no = 3;
 ```
 
 В консоли ничего не выведется, сессия зависнет.
 
 Шаг 5. Сессия 2:
 ```sql
-UPDATE accounts SET amount = amount + 100 where acc_no = 1;
+UPDATE accounts SET amount = amount * 2 where acc_no = 1;
 ```
 
 В консоли ничего не выведется, сессия зависнет.
 
 Шаг 6. Сессия 3:
 ```sql
-UPDATE accounts SET amount = amount + 100 where acc_no = 2;
+UPDATE accounts SET amount = amount * 2 where acc_no = 2;
 ```
 
 В консоли выведется ошибка:
 ```
 ERROR:  deadlock detected
-DETAIL:  Process 6661 waits for ShareLock on transaction 741; blocked by process 6655.
-Process 6655 waits for ShareLock on transaction 740; blocked by process 6658.
-Process 6658 waits for ShareLock on transaction 742; blocked by process 6661.
+DETAIL:  Process 6950 waits for ShareLock on transaction 749; blocked by process 6947.
+Process 6947 waits for ShareLock on transaction 748; blocked by process 6940.
+Process 6940 waits for ShareLock on transaction 750; blocked by process 6950.
 HINT:  See server log for query details.
-CONTEXT:  while updating tuple (0,2) in relation "accounts"
+CONTEXT:  while updating tuple (0,17) in relation "accounts"
 ```
-Как видим из сообщения об ошибке - процесс 6661 ждёт 6655, процесс 6655 ждёт 6658, а процесс 6658 ждёт 6661, что и требовалось по условиям задачи.
+Как видим из сообщения об ошибке - процесс 6950 ждёт 6947, процесс 6947 ждёт 6940, а процесс 6940 ждёт 6950, что и требовалось по условиям задачи.
 
+Посмотрим лог:
+```
+otus@otus-db-pg-vm-1:/var/log/postgresql$ sudo tail -n 23 /var/log/postgresql/postgresql-15-main.log
+```
+
+В консоль выведется:
+```
+2024-02-05 20:12:02.777 UTC [6940] postgres@postgres LOG:  process 6940 still waiting for ShareLock on transaction 750 after 200.090 ms
+2024-02-05 20:12:02.777 UTC [6940] postgres@postgres DETAIL:  Process holding the lock: 6950. Wait queue: 6940.
+2024-02-05 20:12:02.777 UTC [6940] postgres@postgres CONTEXT:  while updating tuple (0,18) in relation "accounts"
+2024-02-05 20:12:02.777 UTC [6940] postgres@postgres STATEMENT:  UPDATE accounts SET amount = amount * 2 where acc_no = 3;
+2024-02-05 20:12:09.256 UTC [6947] postgres@postgres LOG:  process 6947 still waiting for ShareLock on transaction 748 after 200.098 ms
+2024-02-05 20:12:09.256 UTC [6947] postgres@postgres DETAIL:  Process holding the lock: 6940. Wait queue: 6947.
+2024-02-05 20:12:09.256 UTC [6947] postgres@postgres CONTEXT:  while updating tuple (0,1) in relation "accounts"
+2024-02-05 20:12:09.256 UTC [6947] postgres@postgres STATEMENT:  UPDATE accounts SET amount = amount * 2 where acc_no = 1;
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres LOG:  process 6950 detected deadlock while waiting for ShareLock on transaction 749 after 200.075 ms
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres DETAIL:  Process holding the lock: 6947. Wait queue: .
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres CONTEXT:  while updating tuple (0,17) in relation "accounts"
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres STATEMENT:  UPDATE accounts SET amount = amount * 2 where acc_no = 2;
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres ERROR:  deadlock detected
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres DETAIL:  Process 6950 waits for ShareLock on transaction 749; blocked by process 6947.
+        Process 6947 waits for ShareLock on transaction 748; blocked by process 6940.
+        Process 6940 waits for ShareLock on transaction 750; blocked by process 6950.
+        Process 6950: UPDATE accounts SET amount = amount * 2 where acc_no = 2;
+        Process 6947: UPDATE accounts SET amount = amount * 2 where acc_no = 1;
+        Process 6940: UPDATE accounts SET amount = amount * 2 where acc_no = 3;
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres HINT:  See server log for query details.
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres CONTEXT:  while updating tuple (0,17) in relation "accounts"
+2024-02-05 20:12:15.073 UTC [6950] postgres@postgres STATEMENT:  UPDATE accounts SET amount = amount * 2 where acc_no = 2;
+2024-02-05 20:12:15.073 UTC [6940] postgres@postgres LOG:  process 6940 acquired ShareLock on transaction 750 after 12496.153 ms
+2024-02-05 20:12:15.073 UTC [6940] postgres@postgres CONTEXT:  while updating tuple (0,18) in relation "accounts"
+2024-02-05 20:12:15.073 UTC [6940] postgres@postgres STATEMENT:  UPDATE accounts SET amount = amount * 2 where acc_no = 3;
+2024-02-05 20:12:41.850 UTC [6947] postgres@postgres LOG:  process 6947 acquired ShareLock on transaction 748 after 32793.920 ms
+2024-02-05 20:12:41.850 UTC [6947] postgres@postgres CONTEXT:  while updating tuple (0,1) in relation "accounts"
+2024-02-05 20:12:41.850 UTC [6947] postgres@postgres STATEMENT:  UPDATE accounts SET amount = amount * 2 where acc_no = 1;
+```
+Здесь, помимо SQL-запросов, видим:
+```
+Process holding the lock: 6950. Wait queue: 6940.
+Process holding the lock: 6940. Wait queue: 6947.
+Process holding the lock: 6947. Wait queue: .
+deadlock detected
+```
+В третьей строке вместо 6950 пусто, т.к. ожидание процессом 6950 процесса 6947 приведёт к дедлоку. Видим, что ситуация была обнаружена и запросы, на которых это произошло.
