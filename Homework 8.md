@@ -543,3 +543,48 @@ Process holding the lock: 6947. Wait queue: .
 deadlock detected
 ```
 В третьей строке вместо 6950 пусто, т.к. ожидание процессом 6950 процесса 6947 приведёт к дедлоку. Видим, что ситуация была обнаружена, а после сообщения о дедлоке видим запросы, которые к этому привели.
+
+## Задание №4
+
+### Задача
+Выяснить, могут ли две транзакции, выполняющие единственную команду UPDATE одной и той же таблицы (без where), заблокировать друг друга?
+
+### Моделирование ситуации
+
+Для моделирования ситуации понадобится долгий запрос и запрет на обновление строк до окончания транзакии (SELECT FOR UPDATE).
+
+Добавим в таблицу accounts побольше данных:
+```sql
+insert into accounts(acc_no, amount) select *, random() from generate_series(4,1000000);
+```
+
+Теперь начнём в двух разных сессиях новые транзакции:
+```sql
+begin;
+```
+
+Далее требуется выполнить команду в сессии 1, и пока она не завершилась - выполнить другую команду в сессии 2.  
+Команда UPDATE в обеих сессиях будет похожа, внутри будет использоваться SELECT FOR UPDATE. Отличие будет в том, что сессия 1 будет сортировать по возрастанию, а сессия 2 - по убыванию.  
+
+Сессия 1:
+```sql
+update accounts set amount = (select acc_no from accounts order by acc_no asc limit 1 for update);
+```
+
+Сессия 2:
+```sql
+update accounts set amount = (select acc_no from accounts order by acc_no desc limit 1 for update);
+```
+В результате, в сессии 1 в консоль выведется информация о дедлоке:
+```
+ERROR:  deadlock detected
+DETAIL:  Process 7169 waits for ShareLock on transaction 764; blocked by process 7203.
+Process 7203 waits for ShareLock on transaction 763; blocked by process 7169.
+HINT:  See server log for query details.
+CONTEXT:  while updating tuple (10810,150) in relation "test"
+```
+
+В то время, как в сессии 2 команда отработает корректно:
+```
+UPDATE 1000000
+```
