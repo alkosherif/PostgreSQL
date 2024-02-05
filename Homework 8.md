@@ -426,7 +426,7 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
 
 Шаг 1. Сессия 1:
 ```sql
-BEGIN
+BEGIN;
 UPDATE accounts SET amount = amount + 100 where acc_no = 1;
 ```
 
@@ -438,7 +438,7 @@ UPDATE 1
 
 Шаг 2. Сессия 2:
 ```sql
-BEGIN
+BEGIN;
 UPDATE accounts SET amount = amount + 100 where acc_no = 2;
 ```
 
@@ -450,7 +450,7 @@ UPDATE 1
 
 Шаг 3. Сессия 3:
 ```sql
-BEGIN
+BEGIN;
 UPDATE accounts SET amount = amount + 100 where acc_no = 3;
 ```
 
