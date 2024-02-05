@@ -422,6 +422,15 @@ SELECT locktype, relation::REGCLASS, virtualxid as virtxid, transactionid as xid
 
 На вебинаре рассматривался случай для двух транзакций, когда первая ожидает завершения второй, а вторая - завершения первой.  
 По аналогии, для воспроизведения ситуации с тремя транзакции нужно, чтобы 3я транзакция ожидала завершения 2й, 2я - 1й, а 1я - 3й.  
+Воспользуемся ранее созданной таблицей accounts:
+```
+ acc_no | amount
+--------+---------
+      1 | 1000.00
+      2 | 2000.00
+      3 | 3000.00
+(3 rows)
+```
 Открываем три сессии PostgreSQL.  
 
 Шаг 1. Сессия 1:
@@ -479,4 +488,14 @@ UPDATE accounts SET amount = amount + 100 where acc_no = 1;
 UPDATE accounts SET amount = amount + 100 where acc_no = 2;
 ```
 
-В консоли выведется ошибка.
+В консоли выведется ошибка:
+```
+ERROR:  deadlock detected
+DETAIL:  Process 6661 waits for ShareLock on transaction 741; blocked by process 6655.
+Process 6655 waits for ShareLock on transaction 740; blocked by process 6658.
+Process 6658 waits for ShareLock on transaction 742; blocked by process 6661.
+HINT:  See server log for query details.
+CONTEXT:  while updating tuple (0,2) in relation "accounts"
+```
+Как видим из сообщения об ошибке - процесс 6661 ждёт 6655, процесс 6655 ждёт 6658, а процесс 6658 ждёт 6661, что и требовалось по условиям задачи.
+
