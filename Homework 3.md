@@ -114,10 +114,9 @@ Warning: stopping the cluster using pg_ctlcluster will mark the systemd unit as 
 
 ### Проинициализируйте диск согласно инструкции и подмонтировать файловую систему
 
-Выполняем команду:и
+Выполняем команду:  
 ```
 sudo apt install parted
-
 ```
 
 Вводим пароль.  
@@ -204,7 +203,7 @@ sda      8:0    0    25G  0 disk
 └─sda3   8:3    0  24,5G  0 part /var/snap/firefox/common/host-hunspell
                                  /
 sdb      8:16   0   10G  0 disk 
-└─sdb1   8:17   0   10GG  0 part 
+└─sdb1   8:17   0   10G  0 part 
 sr0     11:0    1  1024M  0 rom  
 ```
 
