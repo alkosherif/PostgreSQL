@@ -324,3 +324,29 @@ alter table mytable set (autovacuum_enabled = true);
 ALTER TABLE
 ```
 ### Задание со *: Написать анонимную процедуру, в которой в цикле 10 раз обновятся все строчки в искомой таблице. Не забыть вывести номер шага цикла.
+
+Выполним команду:
+```sql
+do $$declare index int;
+begin
+    for index in 1..10
+    loop
+        raise info 'Step %', index;
+        update mytable set data = data || '0';
+    end loop;
+end$$;
+```
+Таблица сразу начнёт меняться, а в консоль будут выводиться итерации:
+```
+INFO:  Step 1
+INFO:  Step 2
+INFO:  Step 3
+INFO:  Step 4
+INFO:  Step 5
+INFO:  Step 6
+INFO:  Step 7
+INFO:  Step 8
+INFO:  Step 9
+INFO:  Step 10
+DO
+```
