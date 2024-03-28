@@ -112,7 +112,7 @@ select pg_current_wal_lsn(), pg_current_wal_insert_lsn(), pg_walfile_name(pg_cur
 (1 row)
 ```
 
-Теперь подадим нагрузку:
+Теперь подадим нагрузку (8 клиентов, вывод прогресса каждые 60 секунд, время нагрузки 600 секунд):
 ```
 sudo -u postgres pgbench -c8 -P 60 -T 600 postgres
 ```
@@ -153,7 +153,6 @@ sudo -u postgres psql
 И выполним команду:
 ```sql
 select pg_current_wal_lsn(), pg_current_wal_insert_lsn(), pg_walfile_name(pg_current_wal_lsn()) as file_current_wal_lsn, pg_walfile_name(pg_current_wal_insert_lsn()) as file_current_wal_insert_lsn;
-\q
 ```
 
 В консоль выведется:
@@ -165,17 +164,20 @@ select pg_current_wal_lsn(), pg_current_wal_insert_lsn(), pg_walfile_name(pg_cur
 ```
 
 ### Измерьте, какой объем журнальных файлов был сгенерирован за это время. Оцените, какой объем приходится в среднем на одну контрольную точку.
-
+Для измерения прироста объёма журнальных файлов понадобятся исходная и текущая позиции записи в журнале. Получаем разницу с помощью команды:
 ```
 select pg_size_pretty('0/2262D2C8'::pg_lsn - '0/21CDE98'::pg_lsn) wal_size;
 ```
-
+В консоль выведется:
 ```
  wal_size 
 ----------
  516 MB
 (1 row)
 ```
+
+Так как мы настроили выполнение контрольной точки раз в 30 секунд, а общее время теста - 600 секунд, следовательно, должно было создаться 600 / 30 = 20 контрольных точек.  
+516 МБ / 20 = 25,8 МБ приходится на одну контрольную точку.  
 
 ### Проверьте данные статистики: все ли контрольные точки выполнялись точно по расписанию. Почему так произошло?
 
@@ -190,6 +192,80 @@ select * from pg_stat_bgwriter;
 (1 row)
 ```
 
+Видим 54 контрольные точки, следовательно, некоторые выполнились досрочно. Это может быть связано с тем, что при достижении max_wal_size выполняются дополнительные контрольные точки.
 
 ### Сравните tps в синхронном/асинхронном режиме утилитой pgbench. Объясните полученный результат.
+
+Посмотрим текущие настройки:
+```sql
+select name, setting from pg_settings where name in ('synchronous_commit');
+```
+В консоль выведется:
+```
+        name        | setting 
+--------------------+---------
+ synchronous_commit | on
+(1 row)
+```
+
+Включим асинхронный режим:
+```sql
+alter SYSTEM set synchronous_commit = off;
+select pg_reload_conf();
+select name, setting from pg_settings where name in ('synchronous_commit');
+\q
+```
+В консоль выведется:
+```
+ALTER SYSTEM
+
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+        name        | setting 
+--------------------+---------
+ synchronous_commit | off
+(1 row)
+```
+
+Снова подадим нагрузку (8 клиентов, вывод прогресса каждые 60 секунд, время нагрузки 600 секунд):
+```
+sudo -u postgres pgbench -c8 -P 60 -T 600 postgres
+```
+
+В консоль выведется:
+```
+pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+starting vacuum...end.
+progress: 60.0 s, 1823.2 tps, lat 4.334 ms stddev 2.737, 0 failed
+progress: 120.0 s, 1842.7 tps, lat 4.287 ms stddev 2.786, 0 failed
+progress: 180.0 s, 1832.1 tps, lat 4.315 ms stddev 2.676, 0 failed
+progress: 240.0 s, 1834.0 tps, lat 4.310 ms stddev 2.724, 0 failed
+progress: 300.0 s, 1918.0 tps, lat 4.118 ms stddev 2.818, 0 failed
+progress: 360.0 s, 1853.8 tps, lat 4.261 ms stddev 2.818, 0 failed
+progress: 420.0 s, 1842.1 tps, lat 4.292 ms stddev 2.714, 0 failed
+progress: 480.0 s, 1711.2 tps, lat 4.637 ms stddev 2.740, 0 failed
+progress: 540.0 s, 1696.0 tps, lat 4.678 ms stddev 2.830, 0 failed
+progress: 600.0 s, 1840.3 tps, lat 4.296 ms stddev 2.735, 0 failed
+transaction type: <builtin: TPC-B (sort of)>
+scaling factor: 1
+query mode: simple
+number of clients: 8
+number of threads: 1
+maximum number of tries: 1
+duration: 600 s
+number of transactions actually processed: 1091613
+number of failed transactions: 0 (0.000%)
+latency average = 4.347 ms
+latency stddev = 2.763 ms
+initial connection time = 26.342 ms
+tps = 1819.386133 (without initial connection time)
+```
+
+Предыдущее значение tps: 807.408241.  
+Текущее значение tps: 1819.386133.  
+Т.к. в асинхронном режиме транзакции выполняются параллельно, этого следовало ожидать.
+
 ### Создайте новый кластер с включенной контрольной суммой страниц. Создайте таблицу. Вставьте несколько значений. Выключите кластер. Измените пару байт в таблице. Включите кластер и сделайте выборку из таблицы. Что и почему произошло? как проигнорировать ошибку и продолжить работу?
