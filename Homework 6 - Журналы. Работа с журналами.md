@@ -180,11 +180,12 @@ select pg_size_pretty('0/2262D2C8'::pg_lsn - '0/21CDE98'::pg_lsn) wal_size;
 516 МБ / 20 = 25,8 МБ приходится на одну контрольную точку.  
 
 ### Проверьте данные статистики: все ли контрольные точки выполнялись точно по расписанию. Почему так произошло?
-
+В этом поможет команда:
 ```sql
 select * from pg_stat_bgwriter; 
 ```
 
+В консоль выведется:
 ```
  checkpoints_timed | checkpoints_req | checkpoint_write_time | checkpoint_sync_time | buffers_checkpoint | buffers_clean | maxwritten_clean | buffers_backend | buffers_backend_fsync | buffers_alloc |          stats_reset          
 -------------------+-----------------+-----------------------+----------------------+--------------------+---------------+------------------+-----------------+-----------------------+---------------+-------------------------------
