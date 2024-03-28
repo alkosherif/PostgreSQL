@@ -204,13 +204,18 @@ sudo -u postgres psql
 ```
 
 ```sql
-ALTER SYSTEM SET wal_level= 'minimal'; -- Пишем в журнал по минимуму
-ALTER SYSTEM SET synchronous_commit='off'; -- Включаем асинхронный режим
-ALTER SYSTEM SET fsync='off'; -- Выключаем синхронизацию
-ALTER SYSTEM SET full_page_writes='off'; -- Отключаем запись страниц в wal при checkpoint
-ALTER SYSTEM SET default_statistics_target = '100'; -- Улучшаем сбор статистики для лучшей оптимизации запросов
+alter SYSTEM set wal_level= 'minimal'; -- Пишем в журнал по минимуму
+alter SYSTEM set synchronous_commit='off'; -- Включаем асинхронный режим
+alter SYSTEM set fsync='off'; -- Выключаем синхронизацию
+alter SYSTEM set full_page_writes='off'; -- Отключаем запись страниц в wal при checkpoint
+alter SYSTEM set default_statistics_target = '100'; -- Улучшаем сбор статистики для лучшей оптимизации запросов
 \q
 ```
+
+```
+
+```
+
 
 ## написать какого значения tps удалось достичь, показать какие параметры в какие значения устанавливали и почему
 
