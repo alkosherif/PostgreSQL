@@ -166,195 +166,55 @@ max_parallel_workers_per_gather (закомментирован) -> 2
 max_parallel_workers (закомментирован) -> 2  
 
 ## нагрузить кластер через утилиту через утилиту pgbench (https://postgrespro.ru/docs/postgrespro/14/pgbench)
+Снова подадим нагрузку (100 клиентов, вывод прогресса каждые 10 секунд, время нагрузки 60 секунд, 4 потока):
+```
+sudo -u postgres pgbench -c100 -P 10 -T 60 -j 4 postgres
+```
+В консоль выведется:
+```
+pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+starting vacuum...end.
+progress: 10.0 s, 671.3 tps, lat 145.129 ms stddev 163.990, 0 failed
+progress: 20.0 s, 684.7 tps, lat 146.289 ms stddev 189.942, 0 failed
+progress: 30.0 s, 694.8 tps, lat 143.451 ms stddev 134.407, 0 failed
+progress: 40.0 s, 688.0 tps, lat 144.549 ms stddev 167.375, 0 failed
+progress: 50.0 s, 692.2 tps, lat 145.761 ms stddev 187.702, 0 failed
+progress: 60.0 s, 688.6 tps, lat 144.931 ms stddev 172.214, 0 failed
+transaction type: <builtin: TPC-B (sort of)>
+scaling factor: 1
+query mode: simple
+number of clients: 100
+number of threads: 4
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 41296
+number of failed transactions: 0 (0.000%)
+latency average = 145.342 ms
+latency stddev = 170.373 ms
+initial connection time = 106.689 ms
+tps = 686.283433 (without initial connection time)
+```
+
+tps изменилось с 691.562576 до 686.283433, то есть изменение параметров практически не улучшило производительность.
+
+### Попробуем поменять ещё несколько параметров
+Заходим в psql:
+```
+sudo -u postgres psql
+```
+
+```sql
+ALTER SYSTEM SET wal_level= 'minimal'; -- Пишем в журнал по минимуму
+ALTER SYSTEM SET synchronous_commit='off'; -- Включаем асинхронный режим
+ALTER SYSTEM SET fsync='off'; -- Выключаем синхронизацию
+ALTER SYSTEM SET full_page_writes='off'; -- Отключаем запись страниц в wal при checkpoint
+ALTER SYSTEM SET default_statistics_target = '100'; -- Улучшаем сбор статистики для лучшей оптимизации запросов
+\q
+```
+
 ## написать какого значения tps удалось достичь, показать какие параметры в какие значения устанавливали и почему
 
 ## Задание со *: аналогично протестировать через утилиту https://github.com/Percona-Lab/sysbench-tpcc (требует установки
 https://github.com/akopytov/sysbench)
 
 
-Создадим базу для тестов и запустим утилиту нагрузочного тестирования pgbench с дефолтными параметрами
-
-sudo -u postgres psql
-create database test_db;
-CREATE DATABASE
-Посмотрим на производительность с дефолтными параметрами
-
-postgres=# \q
-
-otus@otus:~$ sudo -u postgres pgbench -i test_db
-otus@otus:~$ sudo -u postgres pgbench -c50 -j 2 -T 60 test_db
-pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
-starting vacuum...end.
-transaction type: <builtin: TPC-B (sort of)>
-scaling factor: 1
-query mode: simple
-number of clients: 50
-number of threads: 2
-maximum number of tries: 1
-duration: 60 s
-number of transactions actually processed: 40868
-number of failed transactions: 0 (0.000%)
-latency average = 73.456 ms
-initial connection time = 60.211 ms
-tps = 680.681576 (without initial connection time)
-настроить кластер PostgreSQL 15 на максимальную производительность не обращая внимание на возможные проблемы с надежностью в случае аварийной перезагрузки виртуальной машины
-
-Посмотрим на рекомендации pgtune для текущей виртуалки:
-
-https://www.pgconfig.org/#/?max_connections=50&pg_version=15&environment_name=WEB&total_ram=2&cpus=2&drive_type=HDD&arch=x86-64&os_type=linux
-
-Linux, 64bit
-CPUs: 2
-RAM: 2GB
-Disk: HDD
-Postgres 15
-Max connections 50
-
-# Memory Configuration
-shared_buffers = 512MB
-effective_cache_size = 2GB
-work_mem = 10MB
-maintenance_work_mem = 102MB
-
-# Checkpoint Related Configuration
-min_wal_size = 2GB
-max_wal_size = 3GB
-checkpoint_completion_target = 0.9
-wal_buffers = -1
-
-# Network Related Configuration
-listen_addresses = '*'
-max_connections = 50
-
-# Storage Configuration
-random_page_cost = 4.0
-effective_io_concurrency = 2
-
-# Worker Processes Configuration
-max_worker_processes = 8
-max_parallel_workers_per_gather = 2
-max_parallel_workers = 2
-
-# Logging configuration for pgbadger
-logging_collector = on
-log_checkpoints = on
-log_connections = on
-log_disconnections = on
-log_lock_waits = on
-log_temp_files = 0
-lc_messages = 'C'
-
-# Adjust the minimum time to collect the data
-log_min_duration_statement = '10s'
-log_autovacuum_min_duration = 0
-
-# CSV Configuration
-log_destination = 'csvlog'
-
-добавим эти параметры в конец файла /etc/postgresql/15/main/postgresql.conf
-
-sudo -u postgres psql
-
-postgres=# show config_file;
-               config_file
------------------------------------------
- /etc/postgresql/15/main/postgresql.conf
-(1 row)
-
-postgres=# \q
-otus@otus:~$ sudo nano /etc/postgresql/15/main/postgresql.conf
-
-sudo pg_ctlcluster 15 main restart
-pg_lsclusters
-Ver Cluster Port Status Owner    Data directory              Log file
-15  main    5432 online postgres /var/lib/postgresql/15/main log/postgresql-%Y-%m-%d_%H%M%S.csv
-Запустим тест
-
-otus@otus:~$ sudo -u postgres pgbench -c50 -j 2 -T 60 test_db
-pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
-starting vacuum...end.
-transaction type: <builtin: TPC-B (sort of)>
-scaling factor: 1
-query mode: simple
-number of clients: 50
-number of threads: 2
-maximum number of tries: 1
-duration: 60 s
-number of transactions actually processed: 41551
-number of failed transactions: 0 (0.000%)
-latency average = 72.258 ms
-initial connection time = 64.667 ms
-tps = 691.960238 (without initial connection time)
-Видим незначительный прирост производительности.
-
-Для ускорения СУБД, поменяем еще несколько параметров, жертвуя надежностью:
-
-sudo -u postgres psql
-Режим журналирования в минимум, этого достаточно для восстановаления.
-
-ALTER SYSTEM SET wal_level= 'minimal';
-ALTER SYSTEM
-Также надо поменять max_wal_senders
-
-ALTER SYSTEM SET max_wal_senders='0';
-ALTER SYSTEM
-Перейдем в асинхронный режим, чтобы не ждать завершения операции.
-
-ALTER SYSTEM SET synchronous_commit='off';
-ALTER SYSTEM
-Выключаем синхронизацию.
-
-ALTER SYSTEM SET fsync='off';
-ALTER SYSTEM
-Отключаем запись страниц в wal при checkpoint
-
-ALTER SYSTEM SET full_page_writes='off';
-ALTER SYSTEM
-Увеличение значений shared_buffers и effective_cache_size может улучшить производительность, поскольку это позволяет большему количеству данных храниться в памяти, что уменьшает количество чтения и записи на диск.
-
-ALTER SYSTEM SET shared_buffers = '1GB';
-ALTER SYSTEM
-Увеличение maintenance_work_mem также может улучшить производительность при выполнении операций обслуживания базы данных, таких как ребилд индексов.
-
-ALTER SYSTEM SET maintenance_work_mem = '256MB';
-ALTER SYSTEM
-Установка default_statistics_target на 100 помогает PostgreSQL лучше собирать статистику о данных и использовать ее для оптимизации запросов.
-
-ALTER SYSTEM SET default_statistics_target = '100';
-ALTER SYSTEM
-Установка random_page_cost на 1.1 и effective_io_concurrency на 200 позволяет учитывать случайный доступ к данным и обрабатывать операции ввода-вывода эффективнее.
-
-ALTER SYSTEM SET random_page_cost = '1.1';
-ALTER SYSTEM
-ALTER SYSTEM SET effective_io_concurrency = '200';
-ALTER SYSTEM
-Установка work_mem на 2048kB управляет объемом памяти, выделенной на выполнение каждого оператора сортировки или хэширования.
-
-ALTER SYSTEM SET work_mem = '2048kB';
-ALTER SYSTEM
-postgres=# \q
-
-sudo pg_ctlcluster 15 main restart
-pg_lsclusters
-Ver Cluster Port Status Owner    Data directory              Log file
-15  main    5432 online postgres /var/lib/postgresql/15/main log/postgresql-%Y-%m-%d_%H%M%S.csv
-нагрузить кластер через утилиту через утилиту pgbench
-
-otus@otus:~$ sudo -u postgres pgbench -c50 -j 2 -T 60 test_db
-pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
-starting vacuum...end.
-transaction type: <builtin: TPC-B (sort of)>
-scaling factor: 1
-query mode: simple
-number of clients: 50
-number of threads: 2
-maximum number of tries: 1
-duration: 60 s
-number of transactions actually processed: 133393
-number of failed transactions: 0 (0.000%)
-latency average = 22.503 ms
-initial connection time = 68.622 ms
-tps = 2221.913366 (without initial connection time)
-написать какого значения tps удалось достичь, показать какие параметры в какие значения устанавливали и почему
-
-Удалось значительно повысить скорость - до 2220 tps со средним latency 22.503 ms. Измененные параметры с обоснованием - выше
