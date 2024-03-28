@@ -269,3 +269,178 @@ tps = 1819.386133 (without initial connection time)
 Т.к. в асинхронном режиме транзакции выполняются параллельно, этого следовало ожидать.
 
 ### Создайте новый кластер с включенной контрольной суммой страниц. Создайте таблицу. Вставьте несколько значений. Выключите кластер. Измените пару байт в таблице. Включите кластер и сделайте выборку из таблицы. Что и почему произошло? как проигнорировать ошибку и продолжить работу?
+
+## Создадим кластер:
+```
+sudo pg_createcluster 15 my_claster --start -- --data-checksums
+```
+
+В консоль выведется:
+```
+Creating new PostgreSQL cluster 15/my_claster ...
+/usr/lib/postgresql/15/bin/initdb -D /var/lib/postgresql/15/my_claster --auth-local peer --auth-host scram-sha-256 --no-instructions --data-checksums
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with this locale configuration:
+  provider:    libc
+  LC_COLLATE:  en_US.UTF-8
+  LC_CTYPE:    en_US.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: ru_RU.UTF-8
+  LC_NUMERIC:  ru_RU.UTF-8
+  LC_TIME:     ru_RU.UTF-8
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/15/my_claster ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Europe/Moscow
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+Ver Cluster    Port Status Owner    Data directory                    Log file
+15  my_claster 5433 online postgres /var/lib/postgresql/15/my_claster /var/log/postgresql/postgresql-15-my_claster.log
+```
+
+Подключимся к кластеру:  
+```
+sudo -u postgres psql -p 5433
+```
+Теперь можно вводить команды SQL.  
+## Создадим таблицу и добавим в неё несколько значений:  
+```sql
+create table my_table(data int);
+insert into my_table (select * from generate_series(1, 100) as value);
+```
+
+В консоль выведется:
+```
+CREATE TABLE
+INSERT 0 100
+```
+
+Определим путь до таблицы (он понадобится в дальнейшем):
+```
+select pg_relation_filepath('my_table');
+```
+
+В консоль выведется:
+```
+ pg_relation_filepath 
+----------------------
+ base/5/16391
+(1 row)
+```
+
+## Отключим кластер:
+```
+sudo -u postgres pg_ctlcluster 15 my_claster stop
+```
+В консоль выведется:
+```
+Warning: stopping the cluster using pg_ctlcluster will mark the systemd unit as failed. Consider using systemctl:
+  sudo systemctl stop postgresql@15-my_claster
+```
+
+Проверим, что кластер отключен:
+```
+sudo -u postgres pg_lsclusters
+```
+
+В консоль выведется:
+```
+Ver Cluster    Port Status Owner    Data directory                    Log file
+15  main       5432 online postgres /var/lib/postgresql/15/main       /var/log/postgresql/postgresql-15-main.log
+15  my_claster 5433 down   postgres /var/lib/postgresql/15/my_claster /var/log/postgresql/postgresql-15-my_claster.log
+```
+
+## Скорректируем данные в таблице:
+Заменим в редакторе nano пару байт. Путь до таблицы в кластере берём из раздела про создание таблицы:
+```
+sudo nano /var/lib/postgresql/15/my_claster/base/5/16391
+```
+
+## Включим кластер и сделаем выборку из таблицы:
+```
+sudo -u postgres pg_ctlcluster 15 my_claster start
+```
+В консоль выведется:
+```
+Warning: the cluster will not be running as a systemd service. Consider using systemctl:
+  sudo systemctl start postgresql@15-my_claster
+```
+
+Подключимся к кластеру:  
+```
+sudo -u postgres psql -p 5433
+```
+Теперь можно вводить команды SQL.  
+Делаем выборку из таблицы:
+```sql
+select * from my_table;
+```
+
+В консоль выведется:
+```
+WARNING:  page verification failed, calculated checksum 63580 but expected 26218
+ERROR:  invalid page in block 0 of relation base/5/16391
+```
+## Что и почему произошло?
+
+Не совпадает контрольная сумма, а также указан некорректный блок данных в самом начале.
+
+## Как проигнорировать ошибку и продолжить работу?
+
+Можно отключить проверку контрольной суммы (с перезагрузкой конфигурации):
+```sql
+alter SYSTEM set ignore_checksum_failure = on;
+select pg_reload_conf();
+```
+В консоль выведется:
+```
+ALTER SYSTEM
+
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+```
+
+Снова делаем выборку из таблицы:
+```sql
+select * from my_table;
+```
+
+В консоль выведется:
+```
+data 
+------
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+   13
+   11
+   12
+   13
+   14
+   15
+   16
+   17
+... (пропустим остальные значения)
+```
+
+Как видим, были добавлены значения от 0 до 100, но после правок вместо 10 видим 13.  
+Тем не менее, сама таблица загрузилась.
