@@ -271,7 +271,7 @@ tps = 1819.386133 (without initial connection time)
 
 ### Создайте новый кластер с включенной контрольной суммой страниц. Создайте таблицу. Вставьте несколько значений. Выключите кластер. Измените пару байт в таблице. Включите кластер и сделайте выборку из таблицы. Что и почему произошло? как проигнорировать ошибку и продолжить работу?
 
-## Создадим кластер:
+#### Создадим кластер:
 ```
 sudo pg_createcluster 15 my_claster --start -- --data-checksums
 ```
@@ -315,7 +315,7 @@ Ver Cluster    Port Status Owner    Data directory                    Log file
 sudo -u postgres psql -p 5433
 ```
 Теперь можно вводить команды SQL.  
-## Создадим таблицу и добавим в неё несколько значений:  
+#### Создадим таблицу и добавим в неё несколько значений:  
 ```sql
 create table my_table(data int);
 insert into my_table (select * from generate_series(1, 100) as value);
@@ -340,7 +340,7 @@ select pg_relation_filepath('my_table');
 (1 row)
 ```
 
-## Отключим кластер:
+#### Отключим кластер:
 ```
 sudo -u postgres pg_ctlcluster 15 my_claster stop
 ```
@@ -362,13 +362,13 @@ Ver Cluster    Port Status Owner    Data directory                    Log file
 15  my_claster 5433 down   postgres /var/lib/postgresql/15/my_claster /var/log/postgresql/postgresql-15-my_claster.log
 ```
 
-## Скорректируем данные в таблице:
+#### Скорректируем данные в таблице:
 Заменим в редакторе nano пару байт. Путь до таблицы в кластере берём из раздела про создание таблицы:
 ```
 sudo nano /var/lib/postgresql/15/my_claster/base/5/16391
 ```
 
-## Включим кластер и сделаем выборку из таблицы:
+#### Включим кластер и сделаем выборку из таблицы:
 ```
 sudo -u postgres pg_ctlcluster 15 my_claster start
 ```
@@ -393,11 +393,11 @@ select * from my_table;
 WARNING:  page verification failed, calculated checksum 63580 but expected 26218
 ERROR:  invalid page in block 0 of relation base/5/16391
 ```
-## Что и почему произошло?
+#### Что и почему произошло?
 
 Не совпадает контрольная сумма, а также указан некорректный блок данных в самом начале.
 
-## Как проигнорировать ошибку и продолжить работу?
+#### Как проигнорировать ошибку и продолжить работу?
 
 Можно отключить проверку контрольной суммы (с перезагрузкой конфигурации):
 ```sql
