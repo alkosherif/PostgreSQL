@@ -1,6 +1,7 @@
 # Настройка PostgreSQL. Нагрузочное тестирование и тюнинг PostgreSQL	
-### Развернуть виртуальную машину любым удобным способом
+### Создаем ВМ/докер c ПГ.
 
+#### Создание ВМ
 Для выполнения ДЗ будем использовать **VirtualBox** и образ **Ubuntu 22.04 LTS**, они доступны бесплатно по первой ссылке в гугле.  
 Для запуска ОС потребуется:  
 1. Скачать образ Ubuntu 22.04.4 LTS отсюда: https://ubuntu.com/download/desktop  
@@ -37,10 +38,153 @@
 14.5. Перезагрузить ОС  
 14.6. После этого на экране ВМ будут постоянно появляться странные артефакты, но по крайней мере заработает общий буфер обмена. При изменении размеров окна ВМ проблема пропадает.
 
-### Поставить на неё PostgreSQL 15 любым способом
+#### Установка PostgreSQL 15
 
 В этом поможет следующий набор команд:
 ```
 sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt -y install postgresql-15
 ```
 Появится длинный лог установки, можем его пропустить.
+
+### Создаем БД, схему и в ней таблицу.
+Заходим в psql:
+```
+sudo -u postgres psql
+```
+Теперь можем вводить SQL-команды.  
+Создаём БД и схему:  
+```sql
+create database my_database;
+```
+В консоль выведется:
+```
+CREATE DATABASE
+```
+Переходим в созданную БД:
+```sql
+\c my_database
+```
+В консоль выведется:
+```
+You are now connected to database "my_database" as user "postgres".
+```
+Создаём схему:
+```sql
+create schema my_schema;
+```
+В консоль выведется:
+```
+CREATE SCHEMA
+```
+Создаём таблицу:
+```sql
+create table my_schema.my_table (data int);
+```
+В консоль выведется:
+```
+CREATE TABLE
+```
+### Заполним таблицы автосгенерированными 100 записями.
+```sql
+insert into my_schema.my_table select random() * 1000 from generate_series(1,100);
+```
+В консоль выведется:
+```
+INSERT 0 100
+```
+Посмотрим, какие данные сейчас в таблице для сравнения с будущим бэкапом:
+```sql
+select * from my_schema.my_table limit 10;
+```
+В консоль выведется:
+```
+  data 
+------
+  226
+  862
+  895
+  641
+  738
+  775
+  777
+  571
+  461
+  682
+(10 rows)
+```
+### Под линукс пользователем Postgres создадим каталог для бэкапов
+
+Выйдем из psql:
+```sql
+\q
+```
+Создадим каталог для бэкапов:
+```
+sudo mkdir /mnt/backups
+```
+
+Сделаем пользователя postgres его владельцем:
+```
+sudo chown postgres /mnt/backups
+```
+
+### Сделаем логический бэкап используя утилиту COPY
+Снова заходим в psql:  
+```
+sudo -u postgres psql
+```
+Перейдём в созданную БД:  
+```sql
+\c my_database
+```
+В консоль выведется:  
+```
+You are now connected to database "my_database" as user "postgres".
+```
+Сделаем бэкап:  
+```sql
+\copy my_schema.my_table to '/mnt/backups/my_table_backup1.sql'
+```
+В консоль выведется:
+```
+COPY 100
+```
+### Восстановим в 2 таблицу данные из бэкапа.
+Создадим 2 таблицу:
+```sql
+create table my_schema.my_table_from_backup (data int);
+```
+В консоль выведется:
+```
+CREATE TABLE
+```
+Теперь восстановим в неё данные из бэкапа:
+```sql
+\copy my_schema.my_table_from_backup from '/mnt/backups/my_table_backup1.sql'
+```
+В консоль выведется:
+```
+COPY 100
+```
+Посмотрим, соответствуют ли данные тем, что были раньше:
+```sql
+select * from my_schema.my_table_from_backup limit 10;
+```
+В консоли увидим, что данные в таблицы те же самые:
+```
+  data 
+------
+  226
+  862
+  895
+  641
+  738
+  775
+  777
+  571
+  461
+  682
+(10 rows)
+```
+### Используя утилиту pg_dump создадим бэкап в кастомном сжатом формате двух таблиц
+### Используя утилиту pg_restore восстановим в новую БД только вторую таблицу!
