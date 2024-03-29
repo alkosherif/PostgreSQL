@@ -35,7 +35,7 @@
 14.3. Открыть терминал в папке смонтированного образа  
 14.4. Выполнить команду sudo sh VBoxLinuxAdditions.run  
 14.5. Перезагрузить ОС  
-14.6. После этого на экране ВМ будут постоянно появляться странные артефакты, но по крайней мере заработает общий буфер обмена.
+14.6. После этого на экране ВМ будут постоянно появляться странные артефакты, но по крайней мере заработает общий буфер обмена. При изменении размеров окна ВМ проблема пропадает.
 
 ### Поставить на неё PostgreSQL 15 любым способом
 
@@ -73,12 +73,12 @@ sudo -u postgres pgbench -c100 -P 10 -T 60 -j 4 postgres
 ```
 pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
 starting vacuum...end.
-progress: 10.0 s, 671.1 tps, lat 144.548 ms stddev 155.088, 0 failed
-progress: 20.0 s, 683.9 tps, lat 146.647 ms stddev 156.831, 0 failed
-progress: 30.0 s, 692.8 tps, lat 143.938 ms stddev 156.337, 0 failed
-progress: 40.0 s, 701.0 tps, lat 142.639 ms stddev 152.636, 0 failed
-progress: 50.0 s, 698.7 tps, lat 143.350 ms stddev 148.833, 0 failed
-progress: 60.0 s, 701.5 tps, lat 142.491 ms stddev 138.185, 0 failed
+progress: 10.0 s, 669.8 tps, lat 144.795 ms stddev 157.204, 0 failed
+progress: 20.0 s, 686.7 tps, lat 146.244 ms stddev 162.324, 0 failed
+progress: 30.0 s, 677.7 tps, lat 147.839 ms stddev 196.863, 0 failed
+progress: 40.0 s, 687.9 tps, lat 145.331 ms stddev 149.798, 0 failed
+progress: 50.0 s, 683.7 tps, lat 145.720 ms stddev 160.301, 0 failed
+progress: 60.0 s, 698.4 tps, lat 142.335 ms stddev 152.007, 0 failed
 transaction type: <builtin: TPC-B (sort of)>
 scaling factor: 1
 query mode: simple
@@ -86,18 +86,24 @@ number of clients: 100
 number of threads: 4
 maximum number of tries: 1
 duration: 60 s
-number of transactions actually processed: 41588
+number of transactions actually processed: 41142
 number of failed transactions: 0 (0.000%)
-latency average = 144.249 ms
-latency stddev = 151.548 ms
-initial connection time = 136.808 ms
-tps = 691.562576 (without initial connection time)
+latency average = 145.859 ms
+latency stddev = 164.772 ms
+initial connection time = 102.494 ms
+tps = 683.906524 (without initial connection time)
 ```
 ## Настроить кластер PostgreSQL 15 на максимальную производительность не обращая внимание на возможные проблемы с надежностью в случае аварийной перезагрузки виртуальной машины
 
 ### Определяем рекомендуемые параметры
 В этом поможет ссылка:
 [https://www.pgconfig.org/#/?max_connections=50&pg_version=15&environment_name=WEB&total_ram=2&cpus=2&drive_type=HDD&arch=x86-64&os_type=linux](https://www.pgconfig.org/#/?max_connections=100&pg_version=15&environment_name=WEB&total_ram=8&cpus=2&drive_type=SSD&arch=x86-64&os_type=linux)
+
+### Применяем рекомендуемые параметры
+Редактируем в nano конфигурацию, с помощью сочетания клавиш Ctrl+W ищем параметр и меняем его:
+```
+sudo nano /etc/postgresql/15/main/postgresql.conf
+```
 
 #### Server
 Этот раздел задаём сами.  
@@ -110,36 +116,6 @@ Max connections: 100
 Application profile: General web application  
 PostgreSQL Vertion: 15  
 
-#### Memory Configuration
-shared_buffers = 2GB  
-effective_cache_size = 6GB  
-work_mem = 20MB  
-maintenance_work_mem = 410MB  
-
-#### Checkpoint Related Configuration
-min_wal_size = 2GB  
-max_wal_size = 3GB  
-checkpoint_completion_target = 0.9  
-wal_buffers = -1  
-
-#### Network Related Configuration
-listen_addresses = '*'  
-max_connections = 100  
-
-#### Storage Configuration
-random_page_cost = 1.1  
-effective_io_concurrency = 200  
-
-#### Worker Processes Configuration
-max_worker_processes = 8  
-max_parallel_workers_per_gather = 2  
-max_parallel_workers = 2  
-
-### Применяем рекомендуемые параметры
-Редактируем в nano конфигурацию, с помощью сочетания клавиш Ctrl+W ищем параметр и меняем его:
-```
-sudo nano /etc/postgresql/15/main/postgresql.conf
-```
 #### Memory Configuration
 shared_buffers: 128MB -> 2GB  
 effective_cache_size (закомментирован) -> 6GB  
@@ -165,21 +141,38 @@ max_worker_processes (закомментирован) -> 8
 max_parallel_workers_per_gather (закомментирован) -> 2  
 max_parallel_workers (закомментирован) -> 2  
 
+Заходим в psql:
+```
+sudo -u postgres psql
+```
+
+#### Перезапуск кластера
+Чтобы настройки применились, перезапустим кластер и проверим, что он запущен:
+```
+sudo pg_ctlcluster 15 main restart
+pg_lsclusters
+```
+В консоль выведется:
+```
+Ver Cluster Port Status Owner    Data directory              Log file
+15  main    5432 online postgres /var/lib/postgresql/15/main /var/log/postgresql/postgresql-15-main.log
+```
+
 ## нагрузить кластер через утилиту через утилиту pgbench (https://postgrespro.ru/docs/postgrespro/14/pgbench)
 Снова подадим нагрузку (100 клиентов, вывод прогресса каждые 10 секунд, время нагрузки 60 секунд, 4 потока):
 ```
-sudo -u postgres pgbench -c100 -P 10 -T 60 -j 4 postgres
+sudo -u postgres pgbench -c 100 -P 10 -T 60 -j 4 postgres
 ```
 В консоль выведется:
 ```
 pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
 starting vacuum...end.
-progress: 10.0 s, 671.3 tps, lat 145.129 ms stddev 163.990, 0 failed
-progress: 20.0 s, 684.7 tps, lat 146.289 ms stddev 189.942, 0 failed
-progress: 30.0 s, 694.8 tps, lat 143.451 ms stddev 134.407, 0 failed
-progress: 40.0 s, 688.0 tps, lat 144.549 ms stddev 167.375, 0 failed
-progress: 50.0 s, 692.2 tps, lat 145.761 ms stddev 187.702, 0 failed
-progress: 60.0 s, 688.6 tps, lat 144.931 ms stddev 172.214, 0 failed
+progress: 10.0 s, 653.9 tps, lat 148.525 ms stddev 161.765, 0 failed
+progress: 20.0 s, 681.2 tps, lat 146.734 ms stddev 145.468, 0 failed
+progress: 30.0 s, 680.1 tps, lat 147.206 ms stddev 157.316, 0 failed
+progress: 40.0 s, 683.3 tps, lat 146.243 ms stddev 167.779, 0 failed
+progress: 50.0 s, 687.4 tps, lat 145.068 ms stddev 159.188, 0 failed
+progress: 60.0 s, 674.4 tps, lat 148.181 ms stddev 185.044, 0 failed
 transaction type: <builtin: TPC-B (sort of)>
 scaling factor: 1
 query mode: simple
@@ -187,39 +180,71 @@ number of clients: 100
 number of threads: 4
 maximum number of tries: 1
 duration: 60 s
-number of transactions actually processed: 41296
+number of transactions actually processed: 40703
 number of failed transactions: 0 (0.000%)
-latency average = 145.342 ms
-latency stddev = 170.373 ms
-initial connection time = 106.689 ms
-tps = 686.283433 (without initial connection time)
+latency average = 147.393 ms
+latency stddev = 163.736 ms
+initial connection time = 135.903 ms
+tps = 676.739556 (without initial connection time)
 ```
 
-tps изменилось с 691.562576 до 686.283433, то есть изменение параметров практически не улучшило производительность.
+tps изменилось с 683.906524 до 676.739556, то есть изменение параметров даже немного ухудшило производительность, что можно списать на погрешность.
 
 ### Попробуем поменять ещё несколько параметров
-Заходим в psql:
+Открываем конфигурацию в nano:
 ```
-sudo -u postgres psql
+sudo nano /etc/postgresql/15/main/postgresql.conf
+```
+Меняем параметры с целью уменьшения записей в журнал, включения асинхронности и улучшения оптимизации запросов:
+
+wal_level (закомментирован) -> minimal - Пишем в журнал по минимуму
+max_wal_senders (закомментирован) -> 0 - Отключаем репликацию. Не смотря на то, что репликации нет, без этого кластер не запустится при wal_level = minimal
+synchronous_commit (закомментирован) -> off - Включаем асинхронный режим
+full_page_writes (закомментирован) -> off; - Отключаем запись в wal на контрольных точках
+fsync (закомментирован) -> off - Выключаем синхронизацию
+default_statistics_target (закомментирован) -> '100'; - Улучшаем сбор статистики для лучшей оптимизации запросов
+
+Перезагружаем кластер и смотрим, работает ли:
+```
+sudo pg_ctlcluster 15 main restart
+pg_lsclusters
 ```
 
-```sql
-alter SYSTEM set wal_level= 'minimal'; -- Пишем в журнал по минимуму
-alter SYSTEM set synchronous_commit='off'; -- Включаем асинхронный режим
-alter SYSTEM set fsync='off'; -- Выключаем синхронизацию
-alter SYSTEM set full_page_writes='off'; -- Отключаем запись страниц в wal при checkpoint
-alter SYSTEM set default_statistics_target = '100'; -- Улучшаем сбор статистики для лучшей оптимизации запросов
-\q
+В консоль выведется:
+```
+Ver Cluster Port Status Owner    Data directory              Log file
+15  main    5432 online postgres /var/lib/postgresql/15/main /var/log/postgresql/postgresql-15-main.log
 ```
 
+Ещё раз подадим нагрузку (100 клиентов, вывод прогресса каждые 10 секунд, время нагрузки 60 секунд, 4 потока):
+```
+sudo -u postgres pgbench -c 100 -P 10 -T 60 -j 4 postgres
 ```
 
+Теперь видим:
+```
+pgbench (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+starting vacuum...end.
+progress: 10.0 s, 1250.8 tps, lat 77.791 ms stddev 111.305, 0 failed
+progress: 20.0 s, 1296.8 tps, lat 77.256 ms stddev 97.208, 0 failed
+progress: 30.0 s, 1263.9 tps, lat 78.576 ms stddev 100.887, 0 failed
+progress: 40.0 s, 1290.5 tps, lat 78.195 ms stddev 101.205, 0 failed
+progress: 50.0 s, 1283.1 tps, lat 77.736 ms stddev 98.915, 0 failed
+progress: 60.0 s, 1305.2 tps, lat 76.886 ms stddev 85.218, 0 failed
+transaction type: <builtin: TPC-B (sort of)>
+scaling factor: 1
+query mode: simple
+number of clients: 100
+number of threads: 4
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 77002
+number of failed transactions: 0 (0.000%)
+latency average = 77.827 ms
+latency stddev = 99.319 ms
+initial connection time = 115.370 ms
+tps = 1281.830692 (without initial connection time)
 ```
 
-
-## написать какого значения tps удалось достичь, показать какие параметры в какие значения устанавливали и почему
-
-## Задание со *: аналогично протестировать через утилиту https://github.com/Percona-Lab/sysbench-tpcc (требует установки
-https://github.com/akopytov/sysbench)
-
-
+## Написать какого значения tps удалось достичь, показать какие параметры в какие значения устанавливали и почему
+tps увеличилось с 676.739556 до 1281.830692 (т.е. почти в 2 раза) за счёт меньшей записи в журнал, большей асинхронности и лучшей оптимизации запросов (настройки приведены выше).
