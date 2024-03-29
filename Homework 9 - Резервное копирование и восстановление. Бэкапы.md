@@ -51,8 +51,13 @@ sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.po
 ```
 sudo -u postgres psql
 ```
+В консоль выведется:
+```
+psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+Type "help" for help.
+```
 Теперь можем вводить SQL-команды.  
-Создаём БД и схему:  
+Создаём БД:  
 ```sql
 create database my_database;
 ```
@@ -78,7 +83,7 @@ CREATE SCHEMA
 ```
 Создаём таблицу:
 ```sql
-create table my_schema.my_table (data int);
+create table my_schema.table1 (data int);
 ```
 В консоль выведется:
 ```
@@ -86,7 +91,7 @@ CREATE TABLE
 ```
 ### Заполним таблицы автосгенерированными 100 записями.
 ```sql
-insert into my_schema.my_table select random() * 1000 from generate_series(1,100);
+insert into my_schema.table1 select random() * 1000 from generate_series(1,100);
 ```
 В консоль выведется:
 ```
@@ -94,22 +99,22 @@ INSERT 0 100
 ```
 Посмотрим, какие данные сейчас в таблице для сравнения с будущим бэкапом:
 ```sql
-select * from my_schema.my_table limit 10;
+select * from my_schema.table1 limit 10;
 ```
 В консоль выведется:
 ```
-  data 
+ data 
 ------
-  226
-  862
-  895
-  641
-  738
-  775
-  777
-  571
-  461
-  682
+  714
+  897
+  808
+  143
+  592
+  799
+  742
+  874
+  899
+   67
 (10 rows)
 ```
 ### Под линукс пользователем Postgres создадим каталог для бэкапов
@@ -133,6 +138,11 @@ sudo chown postgres /mnt/backups
 ```
 sudo -u postgres psql
 ```
+В консоль выведется:
+```
+psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+Type "help" for help.
+```
 Перейдём в созданную БД:  
 ```sql
 \c my_database
@@ -143,7 +153,7 @@ You are now connected to database "my_database" as user "postgres".
 ```
 Сделаем бэкап:  
 ```sql
-\copy my_schema.my_table to '/mnt/backups/my_table_backup1.sql'
+\copy my_schema.table1 to '/mnt/backups/table1_backup1.sql'
 ```
 В консоль выведется:
 ```
@@ -152,7 +162,7 @@ COPY 100
 ### Восстановим в 2 таблицу данные из бэкапа.
 Создадим 2 таблицу:
 ```sql
-create table my_schema.my_table_from_backup (data int);
+create table my_schema.table2 (data int);
 ```
 В консоль выведется:
 ```
@@ -160,7 +170,7 @@ CREATE TABLE
 ```
 Теперь восстановим в неё данные из бэкапа:
 ```sql
-\copy my_schema.my_table_from_backup from '/mnt/backups/my_table_backup1.sql'
+\copy my_schema.table2 from '/mnt/backups/table1_backup1.sql'
 ```
 В консоль выведется:
 ```
@@ -168,23 +178,110 @@ COPY 100
 ```
 Посмотрим, соответствуют ли данные тем, что были раньше:
 ```sql
-select * from my_schema.my_table_from_backup limit 10;
+select * from my_schema.table2 limit 10;
 ```
 В консоли увидим, что данные в таблицы те же самые:
 ```
-  data 
+ data 
 ------
-  226
-  862
-  895
-  641
-  738
-  775
-  777
-  571
-  461
-  682
+  714
+  897
+  808
+  143
+  592
+  799
+  742
+  874
+  899
+   67
 (10 rows)
 ```
+Выйдем из psql:
+```sql
+\q
+```
 ### Используя утилиту pg_dump создадим бэкап в кастомном сжатом формате двух таблиц
+Создадим бэкап с максимальной степенью сжатия (-Z 9):
+```
+sudo -u postgres pg_dump -d my_database -U postgres --format=d --table='my_schema.*' -Z 9 -f /mnt/backups/pg_dump_backup
+```
 ### Используя утилиту pg_restore восстановим в новую БД только вторую таблицу!
+Заходим в psql:
+```
+sudo -u postgres psql
+```
+В консоль выведется:
+```
+psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+Type "help" for help.
+```
+Теперь можем вводить SQL-команды.  
+Создаём БД:  
+```sql
+create database my_database2;
+```
+В консоль выведется:
+```
+CREATE DATABASE
+```
+Переходим в созданную БД:
+```sql
+\c my_database2
+```
+В консоль выведется:
+```
+You are now connected to database "my_database2" as user "postgres".
+```
+Создаём схему с тем же названием, что и раньше:
+```sql
+create schema my_schema;
+```
+В консоль выведется:
+```
+CREATE SCHEMA
+```
+Выйдем из psql:
+```
+\q
+```
+**Восстановим только вторую таблицу из бэкапа:**  
+```
+sudo -u postgres pg_restore -d my_database2 -U postgres -t table2 /mnt/backups/pg_dump_backup
+```
+Снова заходим в psql:
+```
+sudo -u postgres psql
+```
+В консоль выведется:
+```
+psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+Type "help" for help.
+```
+Переходим в новую БД:
+```sql
+\c my_database2
+```
+В консоль выведется:
+```
+You are now connected to database "my_database2" as user "postgres".
+```
+И, наконец, запросим данные из восстановленной таблицы:
+```sql
+select * from my_schema.table2 limit 10;
+```
+В консоль выведется:
+```
+ data 
+------
+  714
+  897
+  808
+  143
+  592
+  799
+  742
+  874
+  899
+   67
+(10 rows)
+```
