@@ -158,7 +158,7 @@ Ver Cluster Port Status Owner    Data directory              Log file
 15  main    5432 online postgres /var/lib/postgresql/15/main /var/log/postgresql/postgresql-15-main.log
 ```
 
-## нагрузить кластер через утилиту через утилиту pgbench (https://postgrespro.ru/docs/postgrespro/14/pgbench)
+## Нагрузить кластер через утилиту через утилиту pgbench
 Снова подадим нагрузку (100 клиентов, вывод прогресса каждые 10 секунд, время нагрузки 60 секунд, 4 потока):
 ```
 sudo -u postgres pgbench -c 100 -P 10 -T 60 -j 4 postgres
@@ -197,12 +197,14 @@ sudo nano /etc/postgresql/15/main/postgresql.conf
 ```
 Меняем параметры с целью уменьшения записей в журнал, включения асинхронности и улучшения оптимизации запросов:
 
+```
 wal_level (закомментирован) -> minimal - Пишем в журнал по минимуму
 max_wal_senders (закомментирован) -> 0 - Отключаем репликацию. Не смотря на то, что репликации нет, без этого кластер не запустится при wal_level = minimal
 synchronous_commit (закомментирован) -> off - Включаем асинхронный режим
 full_page_writes (закомментирован) -> off; - Отключаем запись в wal на контрольных точках
 fsync (закомментирован) -> off - Выключаем синхронизацию
 default_statistics_target (закомментирован) -> '100'; - Улучшаем сбор статистики для лучшей оптимизации запросов
+```
 
 Перезагружаем кластер и смотрим, работает ли:
 ```
