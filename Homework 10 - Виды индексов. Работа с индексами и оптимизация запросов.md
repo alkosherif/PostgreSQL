@@ -278,7 +278,6 @@ explain select Text from songs where TextVector @@ phraseto_tsquery('russian', '
 
 ### Реализовать индекс на часть таблицы или индекс на поле с функцией
 
-#### Индекс количества слов в песне
 Попробуем сделать индекс на количество слов в тексте песни.  
 В интернете предлагают для этого посчитать разницу между длиной исходной строки и длиной строки без пробелов.  
 В примерах выше присутствует также '\n', но он заведён не правильно и воспринимается не как символ перевода строки, а как два отдельных символа, поэтому этот момент мы проигнорируем, чтобы всё не переделывать.
@@ -299,15 +298,15 @@ select length(coalesce(Text, '')) - length(replace(coalesce(Text, ''), ' ', ''))
 ```
 Теперь посмотрим на план запроса:
 ```sql
-explain select length(coalesce(Text, '')) - length(replace(coalesce(Text, ''), ' ', '')) + 1 from songs;
+explain select * from songs where (length(coalesce(Text, '')) - length(replace(coalesce(Text, ''), ' ', '')) + 1) > 20;
 ```
 
 В консоль выведется:
 ```
-                            QUERY PLAN                             
--------------------------------------------------------------------
- Limit  (cost=0.00..0.33 rows=5 width=4)
-   ->  Seq Scan on songs  (cost=0.00..6593.11 rows=100005 width=4)
+                                                                              QUERY PLAN                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Seq Scan on songs  (cost=0.00..6843.12 rows=33335 width=200)
+   Filter: (((length((COALESCE(text, ''::character varying))::text) - length(replace((COALESCE(text, ''::character varying))::text, ' '::text, ''::text))) + 1) > 20)
 (2 rows)
 ```
 
@@ -322,47 +321,21 @@ CREATE INDEX
 
 Теперь посмотрим на план запроса:
 ```sql
-explain select length(coalesce(Text, '')) - length(replace(coalesce(Text, ''), ' ', '')) + 1 from songs;
+explain select * from songs where (length(coalesce(Text, '')) - length(replace(coalesce(Text, ''), ' ', '')) + 1) > 20;
 ```
 
 В консоль выведется:
 ```
                             QUERY PLAN                             
--------------------------------------------------------------------
- Limit  (cost=0.00..0.33 rows=5 width=4)
-   ->  Seq Scan on songs  (cost=0.00..6593.11 rows=100005 width=4)
-(2 rows)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on songs  (cost=374.64..5551.01 rows=33335 width=200)
+   Recheck Cond: (((length((COALESCE(text, ''::character varying))::text) - length(replace((COALESCE(text, ''::character varying))::text, ' '::text, ''::text))) + 1) > 20)
+   ->  Bitmap Index Scan on ind_songs_text_words_count  (cost=0.00..366.31 rows=33335 width=0)
+         Index Cond: (((length((COALESCE(text, ''::character varying))::text) - length(replace((COALESCE(text, ''::character varying))::text, ' '::text, ''::text))) + 1) > 20)
+(4 rows)
 ```
 
-Ничего не изменилось.  
-Возможно, это связано с тем, что только в пяти записях слов больше одного и выгоднее сканировать последовательно.  
-
-#### Попробуем сделать индекс на длину текста:
-```sql
-explain select length(Text) from songs;
-```
-
-В консоль выведется:
-```
-                         QUERY PLAN                          
--------------------------------------------------------------
- Seq Scan on songs  (cost=0.00..5593.06 rows=100005 width=4)
-(1 row)
-```
-
-Добавим индекс:
-```sql
-create index ind_songs_text_letters_count on songs((length(Text)));
-```
-В консоль выведется:
-```
-CREATE INDEX
-```
-
-Теперь посмотрим на план запроса:
-```sql
-explain select (length(Text)) from songs;
-```
+Как видно, теперь используется Bitmap Index Scan.
 
 ### Создать индекс на несколько полей
 ### Написать комментарии к каждому из индексов
