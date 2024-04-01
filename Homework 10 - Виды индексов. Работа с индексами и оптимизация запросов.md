@@ -260,7 +260,7 @@ create index idx_songs_text_search on songs using gin(TextVector);
 ```
 CREATE INDEX
 ```
-
+Оценим запрос:
 ```sql
 explain select Text from songs where TextVector @@ phraseto_tsquery('russian', 'Я любил');
 ```
