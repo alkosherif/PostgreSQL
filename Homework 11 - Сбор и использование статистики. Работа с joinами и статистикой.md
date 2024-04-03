@@ -47,7 +47,6 @@ sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.po
 ```
 Появится длинный лог установки, можем его пропустить.
 
-### Наполнение данными
 Заходим в psql:
 
 ```
@@ -60,13 +59,18 @@ psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
 Type "help" for help.
 ```
 
+Теперь можно вводить команды SQL.
+
+## Выполнение ДЗ
+
+### К работе приложить структуру таблиц, для которых выполнялись соединения
+
 #### Создание таблиц
 
 Будем использовать следующие таблицы:
 * Предметы (details)
 * Цвет (colors)
 * Форма (shapes)
-* Фрукты (fruits)
 
 ```sql
 create table colors (
@@ -92,15 +96,6 @@ create table details (
       foreign key(ShapeId) 
         references shapes(Id)
 );
-
-create table fruits (
-    Id serial primary key,
-    Name varchar (100) not null,
-    ColorId int null,
-    constraint fk_color
-      foreign key(ColorId) 
-        references colors(Id)
-);
 ```
 
 В консоли на каждую таблицу выведется:
@@ -108,7 +103,7 @@ create table fruits (
 CREATE TABLE
 ```
 
-#### Добавим немного правдоподобных данных
+#### Добавим данные
 
 ```sql
 -- Заполним таблицу цветов:
@@ -156,15 +151,6 @@ insert into details (Description, ColorId, ShapeId) values
 ('Синий куб', 3, 5),
 ('Зелёная трапеция', 2, 8)
 ;
-
--- Добавим фрукты:
-insert into fruits (Name, ColorId) values
-('Апельсин', 13),
-('Гранат', 1),
-('Киви', 2),
-('Банан', 4),
-('Лайм', 12)
-;
 ```
 
 В консоль выведется:
@@ -172,10 +158,7 @@ insert into fruits (Name, ColorId) values
 INSERT 0 14
 INSERT 0 12
 INSERT 0 8
-INSERT 0 5
 ```
-
-## Выполнение ДЗ
 
 ### Реализовать прямое соединение двух или более таблиц
 
@@ -360,5 +343,52 @@ explain select d.Description as Detail, s.Name as Shape from details d full join
 ```
 
 ### Реализовать запрос, в котором будут использованы разные типы соединений
+
+Запросим объекты с чётко заданной формой и их цвета (при наличии):
+```sql
+select i.Description, c.Name as Color, s.Name as Shape from details i
+left join colors c
+  on i.ColorId = c.Id
+join shapes s
+  on i.ShapeId = s.Id;
+```
+
+В консоль выведется:
+```
+   description    | color |   shape   
+------------------+-------+-----------
+ Красный круг     | Red   | Circle
+ Чёрный квадрат   | Black | Rectangle
+ Треугольник      |       | Triangle
+ Хоровод          |       | Circle
+ Синий куб        | Blue  | Cube
+ Зелёная трапеция | Green | Trapezium
+(6 rows)
+```
+
+Посмотрим на план запроса:
+```sql
+explain select i.Description, c.Name as Color, s.Name as Shape from details i
+left join colors c
+  on i.ColorId = c.Id
+join shapes s
+  on i.ShapeId = s.Id;
+```
+
+В консоль выведется:
+```
+                                  QUERY PLAN                                   
+-------------------------------------------------------------------------------
+ Hash Join  (cost=33.50..48.25 rows=310 width=654)
+   Hash Cond: (i.shapeid = s.id)
+   ->  Hash Left Join  (cost=16.30..30.22 rows=310 width=440)
+         Hash Cond: (i.colorid = c.id)
+         ->  Seq Scan on details i  (cost=0.00..13.10 rows=310 width=226)
+         ->  Hash  (cost=12.80..12.80 rows=280 width=222)
+               ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=222)
+   ->  Hash  (cost=13.20..13.20 rows=320 width=222)
+         ->  Seq Scan on shapes s  (cost=0.00..13.20 rows=320 width=222)
+(9 rows)
+```
+
 ### Сделать комментарии на каждый запрос
-### К работе приложить структуру таблиц, для которых выполнялись соединения
