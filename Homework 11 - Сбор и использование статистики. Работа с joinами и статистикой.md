@@ -159,6 +159,7 @@ INSERT 0 8
 
 ### Реализовать прямое соединение двух или более таблиц
 
+Запросим объекты с известной формой и цветом:
 ```sql
 select i.Description, c.Name as Color, s.Name as Shape from items i
 join colors c
