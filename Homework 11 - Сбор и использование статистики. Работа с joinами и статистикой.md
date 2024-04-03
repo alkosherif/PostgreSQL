@@ -71,7 +71,7 @@ Type "help" for help.
 create table colors (
     Id serial primary key,
     Name varchar(100) not null,
-    Code varchar(10) not null,
+    Code varchar(10) not null
 );
 
 create table shapes (
@@ -86,7 +86,7 @@ create table items (
     ShapeId int null,
     constraint fk_color
       foreign key(ColorId) 
-        references colors(Id)
+        references colors(Id),
     constraint fk_shape
       foreign key(ShapeId) 
         references shapes(Id)
@@ -151,14 +151,58 @@ insert into items (Description, ColorId, ShapeId) values
 В консоль выведется:
 ```
 INSERT 0 14
-INSERT 0 24
+INSERT 0 12
 INSERT 0 8
 ```
-
 
 ## Выполнение ДЗ
 
 ### Реализовать прямое соединение двух или более таблиц
+
+```sql
+select i.Description, c.Name as Color, s.Name as Shape from items i
+join colors c
+  on i.ColorId = c.Id
+join shapes s
+  on i.ShapeId = s.Id;
+```
+
+В консоль выведется:
+```
+   description    | color |   shape   
+------------------+-------+-----------
+ Красный круг     | Red   | Circle
+ Чёрный квадрат   | Black | Rectangle
+ Синий куб        | Blue  | Cube
+ Зелёная трапеция | Green | Trapezium
+(4 rows)
+```
+
+Посмотрим на план запроса:
+```sql
+explain select i.Description, c.Name as Color, s.Name as Shape from items i
+join colors c
+  on i.ColorId = c.Id
+join shapes s
+  on i.ShapeId = s.Id;
+```
+
+В консоль выведется:
+```
+                                  QUERY PLAN                                   
+-------------------------------------------------------------------------------
+ Hash Join  (cost=33.50..48.25 rows=310 width=654)
+   Hash Cond: (i.shapeid = s.id)
+   ->  Hash Join  (cost=16.30..30.22 rows=310 width=440)
+         Hash Cond: (i.colorid = c.id)
+         ->  Seq Scan on items i  (cost=0.00..13.10 rows=310 width=226)
+         ->  Hash  (cost=12.80..12.80 rows=280 width=222)
+               ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=222)
+   ->  Hash  (cost=13.20..13.20 rows=320 width=222)
+         ->  Seq Scan on shapes s  (cost=0.00..13.20 rows=320 width=222)
+(9 rows)
+```
+
 ### Реализовать левостороннее (или правостороннее) соединение двух или более таблиц
 ### Реализовать кросс соединение двух или более таблиц
 ### Реализовать полное соединение двух или более таблиц
