@@ -228,7 +228,7 @@ join shapes s
 
 Запросим все объекты:
 ```sql
-select i.Description, c.Name as Color, s.Name as Shape from details d
+select d.Description, c.Name as Color, s.Name as Shape from details d
 left join colors c
   on d.ColorId = c.Id
 left join shapes s
@@ -252,7 +252,7 @@ left join shapes s
 
 Посмотрим на план запроса:
 ```sql
-explain select i.Description, c.Name as Color, s.Name as Shape from details d
+explain select d.Description, c.Name as Color, s.Name as Shape from details d
 left join colors c
   on d.ColorId = c.Id
 left join shapes s
@@ -276,7 +276,89 @@ left join shapes s
 ```
 
 ### Реализовать кросс соединение двух или более таблиц
+
+Посмотрим все возможные сочетания цветов и фигур:
+```sql
+select c.Name as Color, s.Name as Shape from colors c cross join shapes s;
+```
+В консоль выведется (сокращено):
+```
+ color  |     shape     
+--------+---------------
+ Red    | Circle
+ Green  | Circle
+ Blue   | Circle
+...
+ Red    | Square
+ Green  | Square
+...
+ Gray   | Octagon
+ Tomato | Octagon
+...
+ Orange | Sphere
+ Gold   | Sphere
+(168 rows)
+```
+
+Посмотрим на план запроса:
+```sql
+explain select c.Name as Color, s.Name as Shape from colors c cross join shapes s;
+```
+В консоль выведется:
+```
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
+ Nested Loop  (cost=0.00..1146.70 rows=89600 width=436)
+   ->  Seq Scan on shapes s  (cost=0.00..13.20 rows=320 width=218)
+   ->  Materialize  (cost=0.00..14.20 rows=280 width=218)
+         ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=218)
+(4 rows)
+```
+
 ### Реализовать полное соединение двух или более таблиц
+Посмотрим, у каких деталей нет формы и каких форм детали отсутствуют:
+```sql
+select d.Description as Detail, s.Name as Shape from details d full join shapes s on d.ShapeId = s.Id;
+```
+В консоль выведется:
+```
+      detail      |     shape     
+------------------+---------------
+ Красный круг     | Circle
+ Чёрный квадрат   | Rectangle
+ Деталь           | 
+ Светодиод        | 
+ Треугольник      | Triangle
+ Хоровод          | Circle
+ Синий куб        | Cube
+ Зелёная трапеция | Trapezium
+                  | Hexagon
+                  | Sphere
+                  | Octagon
+                  | Square
+                  | Cylinder
+                  | Cone
+                  | Parallelogram
+(15 rows)
+```
+
+Посмотрим план запроса:
+```sql
+explain select d.Description as Detail, s.Name as Shape from details d full join shapes s on d.ShapeId = s.Id;
+```
+
+В консоль выведется:
+```
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
+ Hash Full Join  (cost=17.20..31.12 rows=320 width=436)
+   Hash Cond: (d.shapeid = s.id)
+   ->  Seq Scan on details d  (cost=0.00..13.10 rows=310 width=222)
+   ->  Hash  (cost=13.20..13.20 rows=320 width=222)
+         ->  Seq Scan on shapes s  (cost=0.00..13.20 rows=320 width=222)
+(5 rows)
+```
+
 ### Реализовать запрос, в котором будут использованы разные типы соединений
 ### Сделать комментарии на каждый запрос
 ### К работе приложить структуру таблиц, для которых выполнялись соединения
