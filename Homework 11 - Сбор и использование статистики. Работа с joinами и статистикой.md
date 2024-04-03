@@ -204,6 +204,56 @@ join shapes s
 ```
 
 ### Реализовать левостороннее (или правостороннее) соединение двух или более таблиц
+
+Запросим все объекты:
+```sql
+select i.Description, c.Name as Color, s.Name as Shape from items i
+left join colors c
+  on i.ColorId = c.Id
+left join shapes s
+  on i.ShapeId = s.Id;
+```
+
+В консоль выведется:
+```
+      description       | color |   shape   
+------------------------+-------+-----------
+ Красный круг           | Red   | Circle
+ Чёрный квадрат         | Black | Rectangle
+ Море                   | Blue  | 
+ Тюльпан                | Blue  | 
+ Бермудский треугольник |       | Triangle
+ Хоровод                |       | Circle
+ Синий куб              | Blue  | Cube
+ Зелёная трапеция       | Green | Trapezium
+(8 rows)
+```
+
+Посмотрим на план запроса:
+```sql
+explain select i.Description, c.Name as Color, s.Name as Shape from items i
+left join colors c
+  on i.ColorId = c.Id
+left join shapes s
+  on i.ShapeId = s.Id;
+```
+
+В консоль выведется:
+```
+                                  QUERY PLAN                                   
+-------------------------------------------------------------------------------
+ Hash Left Join  (cost=33.50..48.25 rows=310 width=654)
+   Hash Cond: (i.shapeid = s.id)
+   ->  Hash Left Join  (cost=16.30..30.22 rows=310 width=440)
+         Hash Cond: (i.colorid = c.id)
+         ->  Seq Scan on items i  (cost=0.00..13.10 rows=310 width=226)
+         ->  Hash  (cost=12.80..12.80 rows=280 width=222)
+               ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=222)
+   ->  Hash  (cost=13.20..13.20 rows=320 width=222)
+         ->  Seq Scan on shapes s  (cost=0.00..13.20 rows=320 width=222)
+(9 rows)
+```
+
 ### Реализовать кросс соединение двух или более таблиц
 ### Реализовать полное соединение двух или более таблиц
 ### Реализовать запрос, в котором будут использованы разные типы соединений
