@@ -47,6 +47,102 @@ sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.po
 ```
 Появится длинный лог установки, можем его пропустить.
 
+### Создание таблиц
+
+Будем использовать следующие таблицы:
+* Предметы (items)
+* Цвет (colors)
+* Форма (shapes)
+
+```sql
+create table colors (
+    Id serial primary key,
+    Name varchar(100) not null,
+    Code varchar(10) not null,
+);
+
+create table shapes (
+    Id serial primary key,
+    Name varchar(100) not null
+);
+
+create table items (
+    Id serial primary key,
+    Description varchar (100) not null,
+    ColorId int null,
+    ShapeId int null,
+    constraint fk_color
+      foreign key(ColorId) 
+        references colors(Id)
+    constraint fk_shape
+      foreign key(ShapeId) 
+        references shapes(Id)
+);
+```
+
+В консоли на каждую таблицу выведется:
+```
+CREATE TABLE
+```
+
+#### Добавим немного правдоподобных данных
+
+```sql
+-- Заполним таблицу цветов:
+insert into colors (Name, Code) values
+('Red', 'FF0000'),     -- 1
+('Green', '00FF00'),   -- 2
+('Blue', '0000FF'),    -- 3
+('Yellow', 'FFFF00'),  -- 4
+('Cyan', '00FFFF'),    -- 5
+('Pink', 'FFCDCB'),    -- 6
+('White', 'FFFFFF'),   -- 7
+('Black', '000000'),   -- 8
+('Brown', 'A52A2A'),   -- 9
+('Gray', '808080'),    -- 10
+('Tomato', 'FF6347'),  -- 11
+('Lime', '1E90FF'),    -- 12
+('Orange', 'F08080'),  -- 13
+('Gold', 'DEB887')     -- 14
+;
+
+-- Добавим фигуры:
+insert into shapes (Name) values
+('Circle'),        -- 1
+('Square'),        -- 2
+('Triangle'),      -- 3
+('Rectangle'),     -- 4
+('Cube'),          -- 5
+('Cylinder'),      -- 6
+('Parallelogram'), -- 7
+('Trapezium'),     -- 8
+('Cone'),          -- 9
+('Octagon'),       -- 10
+('Hexagon'),       -- 11
+('Sphere')         -- 12
+;
+
+-- Добавим предметы:
+insert into items (Description, ColorId, ShapeId) values
+('Красный круг', 1, 1),
+('Чёрный квадрат', 8, 4),
+('Море', 3, null),
+('Тюльпан', 3, null),
+('Бермудский треугольник', null, 3),
+('Хоровод', null, 1),
+('Синий куб', 3, 5),
+('Зелёная трапеция', 2, 8)
+;
+```
+
+В консоль выведется:
+```
+INSERT 0 14
+INSERT 0 24
+INSERT 0 8
+```
+
+
 ## Выполнение ДЗ
 
 ### Реализовать прямое соединение двух или более таблиц
