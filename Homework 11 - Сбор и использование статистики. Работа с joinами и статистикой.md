@@ -63,9 +63,10 @@ Type "help" for help.
 #### Создание таблиц
 
 Будем использовать следующие таблицы:
-* Предметы (items)
+* Предметы (details)
 * Цвет (colors)
 * Форма (shapes)
+* Фрукты (fruits)
 
 ```sql
 create table colors (
@@ -79,7 +80,7 @@ create table shapes (
     Name varchar(100) not null
 );
 
-create table items (
+create table details (
     Id serial primary key,
     Description varchar (100) not null,
     ColorId int null,
@@ -90,6 +91,15 @@ create table items (
     constraint fk_shape
       foreign key(ShapeId) 
         references shapes(Id)
+);
+
+create table fruits (
+    Id serial primary key,
+    Name varchar (100) not null,
+    ColorId int null,
+    constraint fk_color
+      foreign key(ColorId) 
+        references colors(Id)
 );
 ```
 
@@ -135,16 +145,25 @@ insert into shapes (Name) values
 ('Sphere')         -- 12
 ;
 
--- Добавим предметы:
-insert into items (Description, ColorId, ShapeId) values
+-- Добавим детали:
+insert into details (Description, ColorId, ShapeId) values
 ('Красный круг', 1, 1),
 ('Чёрный квадрат', 8, 4),
-('Море', 3, null),
-('Тюльпан', 3, null),
-('Бермудский треугольник', null, 3),
+('Деталь', 3, null),
+('Светодиод', 1, null),
+('Треугольник', null, 3),
 ('Хоровод', null, 1),
 ('Синий куб', 3, 5),
 ('Зелёная трапеция', 2, 8)
+;
+
+-- Добавим фрукты:
+insert into fruits (Name, ColorId) values
+('Апельсин', 13),
+('Гранат', 1),
+('Киви', 2),
+('Банан', 4),
+('Лайм', 12)
 ;
 ```
 
@@ -153,6 +172,7 @@ insert into items (Description, ColorId, ShapeId) values
 INSERT 0 14
 INSERT 0 12
 INSERT 0 8
+INSERT 0 5
 ```
 
 ## Выполнение ДЗ
@@ -161,7 +181,7 @@ INSERT 0 8
 
 Запросим объекты с известной формой и цветом:
 ```sql
-select i.Description, c.Name as Color, s.Name as Shape from items i
+select i.Description, c.Name as Color, s.Name as Shape from details i
 join colors c
   on i.ColorId = c.Id
 join shapes s
@@ -181,7 +201,7 @@ join shapes s
 
 Посмотрим на план запроса:
 ```sql
-explain select i.Description, c.Name as Color, s.Name as Shape from items i
+explain select i.Description, c.Name as Color, s.Name as Shape from details i
 join colors c
   on i.ColorId = c.Id
 join shapes s
@@ -193,10 +213,10 @@ join shapes s
                                   QUERY PLAN                                   
 -------------------------------------------------------------------------------
  Hash Join  (cost=33.50..48.25 rows=310 width=654)
-   Hash Cond: (i.shapeid = s.id)
+   Hash Cond: (d.shapeid = s.id)
    ->  Hash Join  (cost=16.30..30.22 rows=310 width=440)
-         Hash Cond: (i.colorid = c.id)
-         ->  Seq Scan on items i  (cost=0.00..13.10 rows=310 width=226)
+         Hash Cond: (d.colorid = c.id)
+         ->  Seq Scan on details d  (cost=0.00..13.10 rows=310 width=226)
          ->  Hash  (cost=12.80..12.80 rows=280 width=222)
                ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=222)
    ->  Hash  (cost=13.20..13.20 rows=320 width=222)
@@ -208,11 +228,11 @@ join shapes s
 
 Запросим все объекты:
 ```sql
-select i.Description, c.Name as Color, s.Name as Shape from items i
+select i.Description, c.Name as Color, s.Name as Shape from details d
 left join colors c
-  on i.ColorId = c.Id
+  on d.ColorId = c.Id
 left join shapes s
-  on i.ShapeId = s.Id;
+  on d.ShapeId = s.Id;
 ```
 
 В консоль выведется:
@@ -232,11 +252,11 @@ left join shapes s
 
 Посмотрим на план запроса:
 ```sql
-explain select i.Description, c.Name as Color, s.Name as Shape from items i
+explain select i.Description, c.Name as Color, s.Name as Shape from details d
 left join colors c
-  on i.ColorId = c.Id
+  on d.ColorId = c.Id
 left join shapes s
-  on i.ShapeId = s.Id;
+  on d.ShapeId = s.Id;
 ```
 
 В консоль выведется:
@@ -244,10 +264,10 @@ left join shapes s
                                   QUERY PLAN                                   
 -------------------------------------------------------------------------------
  Hash Left Join  (cost=33.50..48.25 rows=310 width=654)
-   Hash Cond: (i.shapeid = s.id)
+   Hash Cond: (d.shapeid = s.id)
    ->  Hash Left Join  (cost=16.30..30.22 rows=310 width=440)
-         Hash Cond: (i.colorid = c.id)
-         ->  Seq Scan on items i  (cost=0.00..13.10 rows=310 width=226)
+         Hash Cond: (d.colorid = c.id)
+         ->  Seq Scan on details d  (cost=0.00..13.10 rows=310 width=226)
          ->  Hash  (cost=12.80..12.80 rows=280 width=222)
                ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=222)
    ->  Hash  (cost=13.20..13.20 rows=320 width=222)
