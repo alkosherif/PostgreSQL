@@ -156,3 +156,65 @@ limit 10;
 (10 rows)
 ```
 Выберем таблицу **tickets** для выполнения ДЗ, т.к. она достаточно большая.  
+Посмотрим, что в ней лежит:
+```sql
+select top 10 * from tickets limit 10;
+```
+
+В консоль выведется:
+```
+   ticket_no   | book_ref | passenger_id |  passenger_name  |                                 contact_data                                 
+---------------+----------+--------------+------------------+------------------------------------------------------------------------------
+ 0005432000860 | 8BBCD2   | 4750 122452  | VLADIMIR FROLOV  | {"phone": "+70125366530"}
+ 0005432000861 | DA7166   | 3889 683019  | NINA BELOVA      | {"email": "belovanina11041976@postgrespro.ru", "phone": "+70048667971"}
+ 0005432000862 | DA7166   | 3554 024596  | KIRA SIDOROVA    | {"email": "sidorova.kira_101971@postgrespro.ru", "phone": "+70398785493"}
+ 0005432000863 | 78E2D2   | 2836 125969  | GENNADIY NIKITIN | {"email": "nikitin_g_111965@postgrespro.ru", "phone": "+70556069198"}
+ 0005432000864 | B8F5BC   | 1665 656774  | FEDOR SHEVCHENKO | {"email": "shevchenkofedor-1963@postgrespro.ru", "phone": "+70644329898"}
+ 0005432000865 | B8F5BC   | 6427 408050  | DAMIR TIMOFEEV   | {"phone": "+70125956007"}
+ 0005432000866 | BD402C   | 6243 166891  | EVGENIY MAKAROV  | {"email": "makarov-e011968@postgrespro.ru", "phone": "+70390705622"}
+ 0005432000867 | 9328AF   | 5496 753314  | ALFIYA FROLOVA   | {"email": "alfiya-frolova1963@postgrespro.ru", "phone": "+70224059780"}
+ 0005432000868 | 9328AF   | 7886 931683  | NADEZHDA KUZMINA | {"email": "kuzmina-nadezhda.121975@postgrespro.ru", "phone": "+70308198082"}
+ 0005432000869 | 9328AF   | 5164 327476  | TATYANA ANDREEVA | {"phone": "+70875110463"}
+(10 rows)
+```
+
+Как видим, ticket_no идёт последовательно, а остальные данные скорее всего не повторяются, поэтому удобнее всего будет секционировать по столбцу ticket_no.  
+Найдём минимальный и максимальный номер билета:
+```sql
+select min(ticket_no), max(ticket_no) from tickets;
+```
+В консоли видим:
+```
+      min      |      max      
+---------------+---------------
+ 0005432000860 | 0005435999873
+(1 row)
+```
+
+Создадим таблицу, основанную на ticket, но с секционированием по номеру билета:
+```sql
+create table tickets_part (like tickets) partition by range(ticket_no);
+```
+В консоль выведется:
+```
+CREATE TABLE
+```
+
+Добавим секции с шагом 1 миллион билетов:
+```sql
+create table tickets_5432 partition of tickets_part for values from (0005432000000) to (0005433000000);
+create table tickets_5433 partition of tickets_part for values from (0005433000000) to (0005434000000);
+create table tickets_5434 partition of tickets_part for values from (0005434000000) to (0005435000000);
+create table tickets_5435 partition of tickets_part for values from (0005435000000) to (0005436000000);
+```
+
+В консоль на каждую строку запроса выведется:
+```
+CREATE TABLE
+```
+
+Заполним секции данными из исходной таблицы:
+```sql
+insert into tickets_part
+select * from tickets;
+```
