@@ -211,9 +211,9 @@ join shapes s
 
 Посмотрим, что будет, если вызвать:
 ```sql
-analyze shapes;
-analyze details;
-analyze colors;
+analyse shapes;
+analyse details;
+analyse colors;
 ```
 В консоль выведется ANALYZE на каждую строку.
 Снова вызовем тот же explain, на этот раз результат будет таким:
