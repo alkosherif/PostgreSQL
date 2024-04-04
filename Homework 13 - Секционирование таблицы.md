@@ -110,4 +110,49 @@ CREATE EXTENSION
 CREATE FUNCTION
 CREATE TABLE
 ```
+Зайдём в psql:
+```
+psql
+```
+В консоль выведется:
+```
+psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+Type "help" for help.
+```
 
+Теперь можно вводить команды SQL.  
+Перейдём в БД demo:
+```sql
+\c demo
+```
+В консоль выведется:
+```
+You are now connected to database "demo" as user "postgres".
+```
+Как видим, база создалась.  
+Посмотрим топ 10 самых больших таблиц в БД:
+```sql
+select (nspname || '.' || relname) as "table",
+    pg_size_pretty(pg_relation_size(c.oid)) as "size"
+from pg_class c
+join pg_namespace ns on (ns.oid = c.relnamespace)
+order by pg_relation_size(c.oid) desc
+limit 10;
+```
+В консоль выведется:
+```
+                       table                        |  size  
+----------------------------------------------------+--------
+ bookings.ticket_flights                            | 154 MB
+ bookings.boarding_passes                           | 109 MB
+ bookings.tickets                                   | 109 MB
+ bookings.ticket_flights_pkey                       | 91 MB
+ bookings.boarding_passes_pkey                      | 73 MB
+ bookings.boarding_passes_flight_id_seat_no_key     | 41 MB
+ bookings.boarding_passes_flight_id_boarding_no_key | 41 MB
+ bookings.bookings                                  | 30 MB
+ bookings.tickets_pkey                              | 25 MB
+ bookings.bookings_pkey                             | 13 MB
+(10 rows)
+```
+Выберем таблицу **tickets** для выполнения ДЗ, т.к. она достаточно большая.  
