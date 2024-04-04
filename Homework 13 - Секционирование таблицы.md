@@ -62,3 +62,52 @@ Type "help" for help.
 Теперь можно вводить команды SQL.
 
 ## Выполнение ДЗ
+
+### Загрузка тестовой базы
+
+Создадим общедоступную папку и перейдём в неё:
+```
+cd /home
+sudo mkdir distr
+sudo chmod 777 distr
+cd distr
+```
+
+Скачаем архив с тестовой базой:
+```
+wget https://edu.postgrespro.ru/demo-medium.zip
+```
+
+В консоль выведется:
+```
+--2024-04-05 01:59:55--  https://edu.postgrespro.ru/demo-medium.zip
+Resolving edu.postgrespro.ru (edu.postgrespro.ru)... 213.171.56.196
+Connecting to edu.postgrespro.ru (edu.postgrespro.ru)|213.171.56.196|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 64544914 (62M) [application/zip]
+Saving to: ‘demo-medium.zip’
+
+demo-medium.zip     100%[==================>]  61,55M  9,24MB/s    in 6,3s    
+
+2024-04-05 02:00:02 (9,70 MB/s) - ‘demo-medium.zip’ saved [64544914/64544914]
+```
+
+Выдадим всем права на архив и вызовем zcat под пользователем postgres:
+```
+sudo chmod 777 demo-medium.zip
+sudo su postgres
+zcat ./demo-medium.zip | psql
+```
+
+В консоли увидим, что происходят изменения в БД (выборочно показаны некоторые строки из большого списка):
+```
+SET
+CREATE DATABASE
+You are now connected to database "demo" as user "postgres".
+SET
+CREATE SCHEMA
+CREATE EXTENSION
+CREATE FUNCTION
+CREATE TABLE
+```
+
