@@ -269,7 +269,7 @@ left join shapes s
   on d.ShapeId = s.Id;
 ```
 
-В консоль выведется:
+Без analyse в консоль выведется:
 ```
                                   QUERY PLAN                                   
 -------------------------------------------------------------------------------
@@ -284,6 +284,26 @@ left join shapes s
          ->  Seq Scan on shapes s  (cost=0.00..13.20 rows=320 width=222)
 (9 rows)
 ```
+
+Снова используется быстрый метод сканирования  с некоторыми обращениями к Seq Scan.  
+
+С analyse по запросу explain в консоль выведется:
+```
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Hash Left Join  (cost=2.59..3.71 rows=8 width=34)
+   Hash Cond: (d.shapeid = s.id)
+   ->  Hash Left Join  (cost=1.32..2.42 rows=8 width=30)
+         Hash Cond: (d.colorid = c.id)
+         ->  Seq Scan on details d  (cost=0.00..1.08 rows=8 width=29)
+         ->  Hash  (cost=1.14..1.14 rows=14 width=9)
+               ->  Seq Scan on colors c  (cost=0.00..1.14 rows=14 width=9)
+   ->  Hash  (cost=1.12..1.12 rows=12 width=12)
+         ->  Seq Scan on shapes s  (cost=0.00..1.12 rows=12 width=12)
+(9 rows)
+```
+
+Как и в прошлый раз, уменьшилось количество сканируемых строк, но план остался тем же.
 
 ### Реализовать кросс соединение двух или более таблиц
 
@@ -314,7 +334,7 @@ select c.Name as Color, s.Name as Shape from colors c cross join shapes s;
 ```sql
 explain select c.Name as Color, s.Name as Shape from colors c cross join shapes s;
 ```
-В консоль выведется:
+В консоль без analyse выведется:
 ```
                                QUERY PLAN                                
 -------------------------------------------------------------------------
@@ -324,6 +344,21 @@ explain select c.Name as Color, s.Name as Shape from colors c cross join shapes 
          ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=218)
 (4 rows)
 ```
+
+Используется довольно дорогой Nested Loop.
+
+Посмотрим на результаты с analyse:
+```
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Nested Loop  (cost=0.00..4.39 rows=168 width=13)
+   ->  Seq Scan on colors c  (cost=0.00..1.14 rows=14 width=5)
+   ->  Materialize  (cost=0.00..1.18 rows=12 width=8)
+         ->  Seq Scan on shapes s  (cost=0.00..1.12 rows=12 width=8)
+(4 rows)
+```
+
+Всё ещё nested loop, но общий cost уменьшился с 1146.70 до 4.39, т.е. примерно в 261 раз!
 
 ### Реализовать полное соединение двух или более таблиц
 Посмотрим, у каких деталей нет формы и каких форм детали отсутствуют:
@@ -357,7 +392,7 @@ select d.Description as Detail, s.Name as Shape from details d full join shapes 
 explain select d.Description as Detail, s.Name as Shape from details d full join shapes s on d.ShapeId = s.Id;
 ```
 
-В консоль выведется:
+В консоль без analyse выведется:
 ```
                                QUERY PLAN                                
 -------------------------------------------------------------------------
@@ -369,15 +404,31 @@ explain select d.Description as Detail, s.Name as Shape from details d full join
 (5 rows)
 ```
 
+Здесь также используется сканирование по хэшу.  
+
+С analyse:
+```
+                              QUERY PLAN                              
+----------------------------------------------------------------------
+ Hash Full Join  (cost=1.27..2.37 rows=12 width=29)
+   Hash Cond: (d.shapeid = s.id)
+   ->  Seq Scan on details d  (cost=0.00..1.08 rows=8 width=25)
+   ->  Hash  (cost=1.12..1.12 rows=12 width=12)
+         ->  Seq Scan on shapes s  (cost=0.00..1.12 rows=12 width=12)
+(5 rows)
+```
+
+Как видим, план всегда остаётся тем же, но количество сканируемых строк значительно уменьшается, как и общая цена запроса.  
+
 ### Реализовать запрос, в котором будут использованы разные типы соединений
 
 Запросим объекты с чётко заданной формой и их цвета (при наличии):
 ```sql
-select i.Description, c.Name as Color, s.Name as Shape from details i
+select d.Description, c.Name as Color, s.Name as Shape from details d
 left join colors c
-  on i.ColorId = c.Id
+  on d.ColorId = c.Id
 join shapes s
-  on i.ShapeId = s.Id;
+  on d.ShapeId = s.Id;
 ```
 
 В консоль выведется:
@@ -395,11 +446,11 @@ join shapes s
 
 Посмотрим на план запроса:
 ```sql
-explain select i.Description, c.Name as Color, s.Name as Shape from details i
+explain select d.Description, c.Name as Color, s.Name as Shape from details d
 left join colors c
-  on i.ColorId = c.Id
+  on d.ColorId = c.Id
 join shapes s
-  on i.ShapeId = s.Id;
+  on d.ShapeId = s.Id;
 ```
 
 В консоль выведется:
@@ -407,10 +458,10 @@ join shapes s
                                   QUERY PLAN                                   
 -------------------------------------------------------------------------------
  Hash Join  (cost=33.50..48.25 rows=310 width=654)
-   Hash Cond: (i.shapeid = s.id)
+   Hash Cond: (d.shapeid = s.id)
    ->  Hash Left Join  (cost=16.30..30.22 rows=310 width=440)
-         Hash Cond: (i.colorid = c.id)
-         ->  Seq Scan on details i  (cost=0.00..13.10 rows=310 width=226)
+         Hash Cond: (d.colorid = c.id)
+         ->  Seq Scan on details d  (cost=0.00..13.10 rows=310 width=226)
          ->  Hash  (cost=12.80..12.80 rows=280 width=222)
                ->  Seq Scan on colors c  (cost=0.00..12.80 rows=280 width=222)
    ->  Hash  (cost=13.20..13.20 rows=320 width=222)
@@ -418,4 +469,26 @@ join shapes s
 (9 rows)
 ```
 
+Снова достаточно оптимальное сканирование по хэшу.  
+
+С analyse:
+```
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Hash Join  (cost=2.59..3.71 rows=8 width=34)
+   Hash Cond: (d.shapeid = s.id)
+   ->  Hash Left Join  (cost=1.32..2.42 rows=8 width=30)
+         Hash Cond: (d.colorid = c.id)
+         ->  Seq Scan on details d  (cost=0.00..1.08 rows=8 width=29)
+         ->  Hash  (cost=1.14..1.14 rows=14 width=9)
+               ->  Seq Scan on colors c  (cost=0.00..1.14 rows=14 width=9)
+   ->  Hash  (cost=1.12..1.12 rows=12 width=12)
+         ->  Seq Scan on shapes s  (cost=0.00..1.12 rows=12 width=12)
+(9 rows)
+```
+
+Результаты те же, что и раньше.
+
 ### Сделать комментарии на каждый запрос
+
+Оставлены комментарии в каждом пункте. Резюмируя - с analyse план запроса не меняется, но сами select'ы происходят намного оптимальнее за счёт меньшего числа сканируемых строк. Особенно это заметно при использовании Nested Loop, когда стоимость запроса сократилась аж в 261 раз.
