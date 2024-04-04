@@ -164,11 +164,11 @@ INSERT 0 8
 
 Запросим объекты с известной формой и цветом:
 ```sql
-select i.Description, c.Name as Color, s.Name as Shape from details i
+select d.Description, c.Name as Color, s.Name as Shape from details d
 join colors c
-  on i.ColorId = c.Id
+  on d.ColorId = c.Id
 join shapes s
-  on i.ShapeId = s.Id;
+  on d.ShapeId = s.Id;
 ```
 
 В консоль выведется:
@@ -184,11 +184,11 @@ join shapes s
 
 Посмотрим на план запроса:
 ```sql
-explain select i.Description, c.Name as Color, s.Name as Shape from details i
+explain select d.Description, c.Name as Color, s.Name as Shape from details d
 join colors c
-  on i.ColorId = c.Id
+  on d.ColorId = c.Id
 join shapes s
-  on i.ShapeId = s.Id;
+  on d.ShapeId = s.Id;
 ```
 
 В консоль выведется:
@@ -206,6 +206,33 @@ join shapes s
          ->  Seq Scan on shapes s  (cost=0.00..13.20 rows=320 width=222)
 (9 rows)
 ```
+
+Видим, что используется достаточно быстрый Hash Join, но внутри всё равно есть Seq Scan.  
+
+Посмотрим, что будет, если вызвать:
+```sql
+analyze shapes;
+analyze details;
+analyze colors;
+```
+В консоль выведется ANALYZE на каждую строку.
+Снова вызовем тот же explain, на этот раз результат будет таким:
+```
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Hash Join  (cost=2.59..3.71 rows=8 width=34)
+   Hash Cond: (i.shapeid = s.id)
+   ->  Hash Join  (cost=1.32..2.42 rows=8 width=30)
+         Hash Cond: (i.colorid = c.id)
+         ->  Seq Scan on details i  (cost=0.00..1.08 rows=8 width=29)
+         ->  Hash  (cost=1.14..1.14 rows=14 width=9)
+               ->  Seq Scan on colors c  (cost=0.00..1.14 rows=14 width=9)
+   ->  Hash  (cost=1.12..1.12 rows=12 width=12)
+         ->  Seq Scan on shapes s  (cost=0.00..1.12 rows=12 width=12)
+(9 rows)
+```
+
+Видим, что методы поиска остались теми же, но количество сканируемых строк значительно уменьшилось, а общая стоимость cost уменьшилась с 48.25 до 3.71, т.е. примерно в 13 раз.
 
 ### Реализовать левостороннее (или правостороннее) соединение двух или более таблиц
 
