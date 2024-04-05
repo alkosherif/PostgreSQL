@@ -152,6 +152,28 @@ ALTER SYSTEM
 ```
 
 ### На 1 ВМ создаем таблицы test для записи, test2 для запросов на чтение.
+
+Заходим в psql на **ВМ 1**:
+```
+sudo -u postgres psql
+```
+В консоль выведется:
+```
+psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+Type "help" for help.
+```
+Теперь можно вводить SQL-команды.  
+Создадим таблицы:
+```sql
+create table test (name varchar PRIMARY KEY);
+create table test2 (name varchar PRIMARY KEY);
+```
+В консоль выведется:
+```
+CREATE TABLE
+CREATE TABLE
+```
+
 ### Создаем публикацию таблицы test и подписываемся на публикацию таблицы test2 с ВМ №2.
 ### На 2 ВМ создаем таблицы test2 для записи, test для запросов на чтение.
 ### Создаем публикацию таблицы test2 и подписываемся на публикацию таблицы test1 с ВМ №1.
