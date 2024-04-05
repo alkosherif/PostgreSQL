@@ -282,3 +282,115 @@ create subscription test2_subscription_vm3_from_vm1 connection 'host=192.168.31.
 NOTICE:  created replication slot "test2_subscription_vm3_from_vm1" on publisher
 CREATE SUBSCRIPTION
 ```
+
+### Проверка работы репликации
+
+#### Проверка изменения таблицы test
+
+На **ВМ 1** добавляем данные:
+```sql
+insert into test values ('123'), ('4567');
+```
+В консоль выведется:
+```
+INSERT 0 2
+```
+
+На **ВМ 2** и **ВМ 3** смотрим, подтянулись ли данные:
+```sql
+select * from test;
+```
+
+На обеих ВМ в консоль выведется:
+```
+ name 
+------
+ 123
+ 4567
+(2 rows)
+```
+
+#### Проверка изменения таблицы test2
+
+На **ВМ 2** добавляем данные:
+```sql
+insert into test2 values ('hello'), ('world');
+```
+В консоль выведется:
+```
+INSERT 0 2
+```
+
+На **ВМ 1** и **ВМ 3** смотрим, подтянулись ли данные:
+```sql
+select * from test2;
+```
+
+На **ВМ 1** в консоль выведется:
+```
+ name 
+------
+(0 rows)
+```
+
+На **ВМ 3** в консоль выведется:
+```
+ name  
+-------
+ hello
+ world
+(2 rows)
+```
+
+Видим, что на ВМ, которая создавалась до публикации, данные не подтянулись, а на ВМ, которая создавалась после - подтянулись.  
+Попробуем пересоздать подписку на **ВМ 1**:
+```
+drop subscription test2_subscription_vm1_from_vm2;
+create subscription test2_subscription_vm1_from_vm2 connection 'host=192.168.31.7 user=postgres dbname=postgres' publication test2_publication_vm2 with (copy_data = true);
+```
+
+В консоль выведется:
+```
+NOTICE:  dropped replication slot "test2_subscription_vm1_from_vm2" on publisher
+DROP SUBSCRIPTION
+NOTICE:  created replication slot "test2_subscription_vm1_from_vm2" on publisher
+CREATE SUBSCRIPTION
+```
+
+Посмотрим, что сейчас в таблице test2 на **ВМ 1**:
+```sql
+select * from test2;
+```
+В консоль выведется:
+```
+ name  
+-------
+ hello
+ world
+(2 rows)
+```
+
+Попробуем добавить ещё одну строку на **ВМ 2**:
+```sql
+insert into test2 values ('new value');
+```
+В консоль выведется:
+```
+INSERT 0 1
+```
+
+Снова посмотрим, что сейчас в таблицах test2 на **ВМ 1** и **ВМ 3**:
+```sql
+select * from test2;
+```
+В консоль на обеих ВМ выведется:
+```
+   name    
+-----------
+ hello
+ world
+ new value
+(3 rows)
+```
+
+Теперь репликация работает на всех ВМ.
