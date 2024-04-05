@@ -175,6 +175,27 @@ CREATE TABLE
 ```
 
 ### Создаем публикацию таблицы test и подписываемся на публикацию таблицы test2 с ВМ №2.
+
+Продолжаем работать на **ВМ 1**. Создадим публицацию:
+```sql
+create publication test_publication_vm1 for table test;
+```
+В консоль выведется:
+```
+CREATE PUBLICATION
+```
+
+Подпишемся на публикацию таблицы test 2 с ВМ 2 (всё ещё остаёмся на **ВМ 1**):
+```sql
+create subscription test2_subscription_vm1_from_vm2 connection 'host=158.160.150.223 user=postgres dbname=postgres password=pass' publication test2_publication_vm2 with (copy_data = true);
+```
+В консоль выведется:
+```
+WARNING:  publication "test2_publication_vm2" does not exist on the publisher
+NOTICE:  created replication slot "test2_subscription_vm1_from_vm2" on publisher
+CREATE SUBSCRIPTION
+```
+
 ### На 2 ВМ создаем таблицы test2 для записи, test для запросов на чтение.
 ### Создаем публикацию таблицы test2 и подписываемся на публикацию таблицы test1 с ВМ №1.
 ### 3 ВМ использовать как реплику для чтения и бэкапов (подписаться на таблицы из ВМ №1 и №2 ).
