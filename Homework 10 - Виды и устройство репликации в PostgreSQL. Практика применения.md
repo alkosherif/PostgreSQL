@@ -124,7 +124,7 @@ host          postgres  postgres  192.168.31.6/32  trust
 host          postgres  postgres  192.168.31.7/32  trust
 ```
 
-На каждой ВМ перезагружаем конфигурацию:
+На **каждой ВМ** перезагружаем конфигурацию:
 ```
 sudo -u postgres psql -c 'SELECT pg_reload_conf();'
 ```
@@ -136,6 +136,20 @@ sudo -u postgres psql -c 'SELECT pg_reload_conf();'
 (1 row)
 ```
 
+Также на каждой ВМ задаём логический wal_level и перезапускаем кластер:
+```
+sudo -u postgres psql -c 'ALTER SYSTEM SET wal_level = logical;'
+sudo systemctl restart postgresql@15-main
+sudo -u postgres psql -c 'show wal_level;'
+```
+В консоль выведется:
+```
+ALTER SYSTEM
+ wal_level 
+-----------
+ logical
+(1 row)
+```
 
 ### На 1 ВМ создаем таблицы test для записи, test2 для запросов на чтение.
 ### Создаем публикацию таблицы test и подписываемся на публикацию таблицы test2 с ВМ №2.
