@@ -187,7 +187,7 @@ CREATE PUBLICATION
 
 Подпишемся на публикацию таблицы test 2 с ВМ 2 (всё ещё остаёмся на **ВМ 1**):
 ```sql
-create subscription test2_subscription_vm1_from_vm2 connection 'host=158.160.150.223 user=postgres dbname=postgres password=pass' publication test2_publication_vm2 with (copy_data = true);
+create subscription test2_subscription_vm1_from_vm2 connection 'host=192.168.31.7 user=postgres dbname=postgres password=pass' publication test2_publication_vm2 with (copy_data = true);
 ```
 В консоль выведется:
 ```
