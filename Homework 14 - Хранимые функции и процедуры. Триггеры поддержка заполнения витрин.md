@@ -123,29 +123,59 @@ INSERT 0 4
  Автомобиль Ferrari FXX K | 185000000.01
  Спички хозайственные     |        65.50
 (2 rows)
+CREATE TABLE
 ```
+
+### Актуализируем таблицу good_sum_mart
+
+Таблица пуста, перенесём в неё данные:
+```sql
+insert into good_sum_mart(good_name, sum_sale)
+    select g.good_name, sum(g.good_price * s.sales_qty) from goods g
+    inner join sales s
+        on s.good_id = g.goods_id
+    group by g.good_name;
+```
+В консоль выведется:
+```
+INSERT 0 2
+```
+Посмотрим, что лежит в таблице:
+```sql
+select * from good_sum_mart;
+```
+
+В консоль выведется:
+```
+        good_name         |   sum_sale   
+--------------------------+--------------
+ Автомобиль Ferrari FXX K | 185000000.01
+ Спички хозайственные     |        65.50
+(2 rows)
+```
+
+Полученные данные в таблице совпадают с запрошенным ранее отчётом.
 
 ### Создать триггер на таблице продаж, для поддержки данных в витрине в актуальном состоянии (вычисляющий при каждой продаже сумму и записывающий её в витрину)
 
 Создадим функцию, расчитывающую новую сумму при изменении таблицы sales и добавим триггер:
 ```sql
-create or replace function func_good_sum_mart() returns trigger as
+create or replace function update_sum() returns trigger as
 $$
 declare
-    good_name_old varchar(63);
-    good_name_new varchar(63);
+    modifying_good_name varchar(63);
     good_price_old numeric(12, 2);
     good_price_new numeric(12, 2);
     sum_increment numeric(16, 2);
 begin
     sum_increment := 0;
-
+   
     if (old is not null) then
-        select good_name, good_price into good_name_old, good_price_old from pract_functions.goods where goods_id = old.good_id;
+        select good_name, good_price into modifying_good_name, good_price_old from pract_functions.goods where goods_id = old.good_id;
     end if;
 
     if (new is not null) then
-        select good_name, good_price into good_name_new, good_price_new from pract_functions.goods where goods_id = new.good_id;
+        select good_name, good_price into modifying_good_name, good_price_new from pract_functions.goods where goods_id = new.good_id;
     end if; 
 
     select
@@ -157,14 +187,14 @@ begin
         end
     into sum_increment;
 
-    if exists (select 1 from pract_functions.good_sum_mart where good_name = good_name_new)
+    if exists (select 1 from pract_functions.good_sum_mart where good_name = modifying_good_name)
     then 
-        insert into pract_functions.good_sum_mart (good_name, sum_sale)
-        values (good_name_new, sum_increment);
-    else
         update pract_functions.good_sum_mart
         set sum_sale = pract_functions.good_sum_mart.sum_sale + sum_increment
-        where good_name = good_name_new;
+        where good_name = modifying_good_name;
+    else
+        insert into pract_functions.good_sum_mart (good_name, sum_sale)
+        values (modifying_good_name, sum_increment);
     end if;  
   return new;
 end;
@@ -174,7 +204,7 @@ language plpgsql;
 -- Добавляем триггер:
 create trigger trigger_sales
 after insert or delete or update on pract_functions.sales
-for each row execute function func_good_sum_mart();
+for each row execute function update_sum();
 ```
 
 В консоль выведется:
@@ -182,6 +212,58 @@ for each row execute function func_good_sum_mart();
 CREATE FUNCTION
 CREATE TRIGGER
 ```
+
+Добавим запись о продаже автомобиля и посмотрим, как изменилась витрина:
+```sql
+insert into sales (good_id, sales_qty) values (2, 1);
+select * from good_sum_mart;
+```
+В консоль выведется:
+```
+INSERT 0 1
+        good_name         |   sum_sale   
+--------------------------+--------------
+ Спички хозайственные     |        65.50
+ Автомобиль Ferrari FXX K | 370000000.02
+(2 rows)
+```
+Как видно, сумма продаж автомобиля увеличилась вдвое.
+
+Попробуем удалить все записи о продаже автомобилей и снова посмотрим на витрину:
+```sql
+delete from sales where good_id = 2;
+select * from good_sum_mart;
+```
+В консоль выведется:
+```
+DELETE 2
+        good_name         | sum_sale 
+--------------------------+----------
+ Спички хозайственные     |    65.50
+ Автомобиль Ferrari FXX K |     0.00
+(2 rows)
+```
+Видим, что запись об автомобиле осталась, но сумма продаж изменилась на 0.  
+Если нужно, чтобы строки без продаж не выводились, можно добавить в функцию update_sum перед return new удаление записей с нулевой суммой:
+```sql
+delete from pract_functions.good_sum_mart where sum_sale = 0;
+```
+Т.к. продаж с отрицательной суммой и нулевой суммой, предположитель, не будет, такой подход должен сработать.  
+Не будем менять функцию, проверим, как работает обновление строки продаж:
+```sql
+update sales set sales_qty = 12 where sales_qty = 120;
+select * from good_sum_mart;
+```
+В консоль выведется:
+```
+UPDATE 1
+        good_name         | sum_sale 
+--------------------------+----------
+ Автомобиль Ferrari FXX K |     0.00
+ Спички хозайственные     |    11.50
+(2 rows)
+```
+Т.е. уменьшили число проданных спичек со 120 до 12 (на 108), сумма изменилась с 65.50 до 11.50 (на 54). Цена одной позиции спичек равна 108 / 54 = 2. А должна быть 0.5...
 
 ### Чем такая схема (витрина+триггер) предпочтительнее отчета, создаваемого "по требованию" (кроме производительности)?
 -- Подсказка: В реальной жизни возможны изменения цен.
