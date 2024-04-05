@@ -165,8 +165,8 @@ Type "help" for help.
 Теперь можно вводить SQL-команды.  
 Создадим таблицы:
 ```sql
-create table test (name varchar PRIMARY KEY);
-create table test2 (name varchar PRIMARY KEY);
+create table test (name varchar primary key);
+create table test2 (name varchar primary key);
 ```
 В консоль выведется:
 ```
@@ -187,7 +187,7 @@ CREATE PUBLICATION
 
 Подпишемся на публикацию таблицы test 2 с ВМ 2 (всё ещё остаёмся на **ВМ 1**):
 ```sql
-create subscription test2_subscription_vm1_from_vm2 connection 'host=192.168.31.7 user=postgres dbname=postgres password=pass' publication test2_publication_vm2 with (copy_data = true);
+create subscription test2_subscription_vm1_from_vm2 connection 'host=192.168.31.7 user=postgres dbname=postgres' publication test2_publication_vm2 with (copy_data = true);
 ```
 В консоль выведется:
 ```
@@ -197,5 +197,50 @@ CREATE SUBSCRIPTION
 ```
 
 ### На 2 ВМ создаем таблицы test2 для записи, test для запросов на чтение.
+
+Заходим в psql на **ВМ 2**:
+```
+sudo -u postgres psql
+```
+В консоль выведется:
+```
+psql (15.6 (Ubuntu 15.6-1.pgdg22.04+1))
+Type "help" for help.
+```
+Теперь можно вводить SQL-команды.  
+Создадим таблицы:
+```sql
+create table test (name varchar primary key);
+create table test2 (name varchar primary key);
+```
+В консоль выведется:
+```
+CREATE TABLE
+CREATE TABLE
+```
+
 ### Создаем публикацию таблицы test2 и подписываемся на публикацию таблицы test1 с ВМ №1.
+
+Продолжаем работать на **ВМ 2**. Создадим публицацию:
+```sql
+create publication test2_publication_vm2 for table test2;
+```
+В консоль выведется:
+```
+CREATE PUBLICATION
+```
+
+Подпишемся на публикацию таблицы test с ВМ 1 (всё ещё остаёмся на **ВМ 2**):
+```sql
+create subscription test2_subscription_vm2_from_vm1 connection 'host=192.168.31.6 user=postgres dbname=postgres' publication test_publication_vm1 with (copy_data = true);
+```
+В консоль выведется:
+```
+WARNING:  publication "test_publication_vm1" does not exist on the publisher
+NOTICE:  created replication slot "test2_subscription_vm2_from_vm1" on publisher
+CREATE SUBSCRIPTION
+```
+
 ### 3 ВМ использовать как реплику для чтения и бэкапов (подписаться на таблицы из ВМ №1 и №2 ).
+
+
