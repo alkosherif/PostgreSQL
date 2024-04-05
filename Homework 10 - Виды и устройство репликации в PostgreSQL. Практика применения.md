@@ -126,7 +126,7 @@ host          postgres  postgres  192.168.31.7/32  trust
 
 На **каждой ВМ** перезагружаем конфигурацию:
 ```
-sudo -u postgres psql -c 'SELECT pg_reload_conf();'
+sudo -u postgres psql -c 'select pg_reload_conf();'
 ```
 В консоль выведется:
 ```
@@ -138,7 +138,7 @@ sudo -u postgres psql -c 'SELECT pg_reload_conf();'
 
 Также на каждой ВМ задаём логический wal_level и перезапускаем кластер:
 ```
-sudo -u postgres psql -c 'ALTER SYSTEM SET wal_level = logical;'
+sudo -u postgres psql -c 'alter system set wal_level = logical;'
 sudo systemctl restart postgresql@15-main
 sudo -u postgres psql -c 'show wal_level;'
 ```
