@@ -236,7 +236,6 @@ create subscription test2_subscription_vm2_from_vm1 connection 'host=192.168.31.
 ```
 В консоль выведется:
 ```
-WARNING:  publication "test_publication_vm1" does not exist on the publisher
 NOTICE:  created replication slot "test2_subscription_vm2_from_vm1" on publisher
 CREATE SUBSCRIPTION
 ```
