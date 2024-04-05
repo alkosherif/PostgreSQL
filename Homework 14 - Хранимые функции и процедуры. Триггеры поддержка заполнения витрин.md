@@ -70,7 +70,7 @@ Type "help" for help.
 DROP SCHEMA IF EXISTS pract_functions CASCADE;
 CREATE SCHEMA pract_functions;
 
-SET search_path = pract_functions, publ
+SET search_path = pract_functions, publ;
 
 -- товары:
 CREATE TABLE goods
@@ -109,7 +109,79 @@ CREATE TABLE good_sum_mart
 );
 ```
 
+В консоль выведется:
+```
+DROP SCHEMA
+CREATE SCHEMA
+SET
+CREATE TABLE
+INSERT 0 2
+CREATE TABLE
+INSERT 0 4
+        good_name         |     sum      
+--------------------------+--------------
+ Автомобиль Ferrari FXX K | 185000000.01
+ Спички хозайственные     |        65.50
+(2 rows)
+```
+
 ### Создать триггер на таблице продаж, для поддержки данных в витрине в актуальном состоянии (вычисляющий при каждой продаже сумму и записывающий её в витрину)
+
+Создадим функцию, расчитывающую новую сумму при изменении таблицы sales и добавим триггер:
+```sql
+create or replace function func_good_sum_mart() returns trigger as
+$$
+declare
+    good_name_old varchar(63);
+    good_name_new varchar(63);
+    good_price_old numeric(12, 2);
+    good_price_new numeric(12, 2);
+    sum_increment numeric(16, 2);
+begin
+    sum_increment := 0;
+
+    if (old is not null) then
+        select good_name, good_price into good_name_old, good_price_old from pract_functions.goods where goods_id = old.good_id;
+    end if;
+
+    if (new is not null) then
+        select good_name, good_price into good_name_new, good_price_new from pract_functions.goods where goods_id = new.good_id;
+    end if; 
+
+    select
+        case
+            when tg_op = 'INSERT' then new.sales_qty * good_price_new
+            when tg_op = 'DELETE' then -old.sales_qty * good_price_old
+            when tg_op = 'UPDATE' then (new.sales_qty * good_price_new) - (old.sales_qty * good_price_old)
+            else 0
+        end
+    into sum_increment;
+
+    if exists (select 1 from pract_functions.good_sum_mart where good_name = good_name_new)
+    then 
+        insert into pract_functions.good_sum_mart (good_name, sum_sale)
+        values (good_name_new, sum_increment);
+    else
+        update pract_functions.good_sum_mart
+        set sum_sale = pract_functions.good_sum_mart.sum_sale + sum_increment
+        where good_name = good_name_new;
+    end if;  
+  return new;
+end;
+$$
+language plpgsql;
+
+-- Добавляем триггер:
+create trigger trigger_sales
+after insert or delete or update on pract_functions.sales
+for each row execute function func_good_sum_mart();
+```
+
+В консоль выведется:
+```
+CREATE FUNCTION
+CREATE TRIGGER
+```
 
 ### Чем такая схема (витрина+триггер) предпочтительнее отчета, создаваемого "по требованию" (кроме производительности)?
 -- Подсказка: В реальной жизни возможны изменения цен.
