@@ -79,6 +79,64 @@ Type "help" for help.
 
 ## Выполнение ДЗ
 
+### Настройка ВМ для репликации
+
+**На каждой ВМ** укажем прослушивание любых адресов:
+```
+sudo -u postgres psql -c "alter system set listen_addresses = '*'"
+sudo systemctl restart postgresql@15-main
+```
+В консоль выведется:
+```
+ALTER SYSTEM
+```
+
+Посмотрим ip адреса каждой ВМ командой ifconfig.  
+Если ifconfig не установлен, можно это исправить следующей командой (она и так выведется в подсказке при вызове ifconfig):
+```
+sudo apt install net-tools
+```
+ВМ 1: 192.168.31.6
+ВМ 2: 192.168.31.7
+ВМ 3: 192.168.31.8
+
+Теперь нужно на каждой ВМ прописать адреса других ВМ.  
+Открываем nano и редактируем конфигурацию:
+```
+sudo nano /etc/postgresql/15/main/pg_hba.conf
+```
+
+Добавляем адреса на **ВМ 1**:
+```
+host          postgres  postgres  192.168.31.7/32  trust
+host          postgres  postgres  192.168.31.8/32  trust
+```
+
+Добавляем адреса на **ВМ 2**:
+```
+host          postgres  postgres  192.168.31.6/32  trust
+host          postgres  postgres  192.168.31.8/32  trust
+```
+
+Добавляем адреса на **ВМ 3**:
+```
+host          postgres  postgres  192.168.31.6/32  trust
+host          postgres  postgres  192.168.31.7/32  trust
+```
+
+На каждой ВМ перезагружаем конфигурацию:
+```
+sudo -u postgres psql -c 'SELECT pg_reload_conf();'
+```
+В консоль выведется:
+```
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+```
+
+
 ### На 1 ВМ создаем таблицы test для записи, test2 для запросов на чтение.
 ### Создаем публикацию таблицы test и подписываемся на публикацию таблицы test2 с ВМ №2.
 ### На 2 ВМ создаем таблицы test2 для записи, test для запросов на чтение.
