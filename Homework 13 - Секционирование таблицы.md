@@ -202,10 +202,11 @@ CREATE TABLE
 
 Добавим секции с шагом 1 миллион билетов:
 ```sql
-create table tickets_5432 partition of tickets_part for values from (0005432000000) to (0005433000000);
-create table tickets_5433 partition of tickets_part for values from (0005433000000) to (0005434000000);
-create table tickets_5434 partition of tickets_part for values from (0005434000000) to (0005435000000);
-create table tickets_5435 partition of tickets_part for values from (0005435000000) to (0005436000000);
+create table tickets_5432 partition of tickets_part for values from ('0005432000000') to ('0005433000000');
+create table tickets_5433 partition of tickets_part for values from ('0005433000000') to ('0005434000000');
+create table tickets_5434 partition of tickets_part for values from ('0005434000000') to ('0005435000000');
+create table tickets_5435 partition of tickets_part for values from ('0005435000000') to ('0005436000000');
+create table tickets_default partition of tickets_part default;
 ```
 
 В консоль на каждую строку запроса выведется:
@@ -217,4 +218,61 @@ CREATE TABLE
 ```sql
 insert into tickets_part
 select * from tickets;
+```
+В консоль выведется:
+```
+INSERT 0 829071
+```
+Убедимся, что данные корректно распределены по секциям:
+```sql
+select min(ticket_no), max(ticket_no) from tickets_5432;
+select min(ticket_no), max(ticket_no) from tickets_5433;
+select min(ticket_no), max(ticket_no) from tickets_5434;
+select min(ticket_no), max(ticket_no) from tickets_5435;
+select min(ticket_no), max(ticket_no) from tickets_default;
+```
+
+В консоли видим, что данные не выходят за границы заданных диапазонов:
+```
+      min      |      max      
+---------------+---------------
+ 0005432000860 | 0005432986018
+(1 row)
+
+      min      |      max      
+---------------+---------------
+ 0005433005039 | 0005433989906
+(1 row)
+
+      min      |      max      
+---------------+---------------
+ 0005434018340 | 0005434995382
+(1 row)
+
+      min      |      max      
+---------------+---------------
+ 0005435005159 | 0005435999873
+(1 row)
+
+ min | max 
+-----+-----
+     | 
+(1 row)
+```
+
+Теперь посмотрим план запроса для заданного диапазона номеров билетов:
+```
+explain select * from tickets_part where ticket_no > '0005433000000' and ticket_no < '0005435000000';
+```
+
+В консоли видим, что сканирование происходит только по tickets_5433 и tickets_5434, снижая нагрузку на остальные данные таблицы.
+```
+                                            QUERY PLAN                                          
+---------------------------------------------------------------------------------------------------
+ Append  (cost=0.00..15298.82 rows=416178 width=104)
+   ->  Seq Scan on tickets_5433 tickets_part_1  (cost=0.00..6600.57 rows=207863 width=104)
+         Filter: ((ticket_no > '0005433000000'::bpchar) AND (ticket_no < '0005435000000'::bpchar))
+   ->  Seq Scan on tickets_5434 tickets_part_2  (cost=0.00..6617.35 rows=208315 width=104)
+         Filter: ((ticket_no > '0005433000000'::bpchar) AND (ticket_no < '0005435000000'::bpchar))
+(5 rows)
 ```
