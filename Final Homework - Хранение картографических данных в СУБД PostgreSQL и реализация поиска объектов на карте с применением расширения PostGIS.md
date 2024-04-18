@@ -244,3 +244,112 @@ st_astext
 LINESTRING(3375694.840784354 8386637.179324647,3375652.3278708206 8386693.962736382,3375604.8835038445 8386757.369544521,3375571.643503893 8386802.952553703,3375569.662016957 8386805.041689111,3375567.4022312937 8386806.308505548,3375564.8641469036 8386806.508529214,3375562.448513954 8386805.841783681,3375552.0846693614 8386801.596838493,3375469.5301349885 8386765.659363829,3375420.7054063263 8386744.92372071,3375405.877650153 8386735.3448956255,3375358.422151228 8386700.163378094,3375303.6084339614 8386656.225610069,3375287.956913556 8386642.179803213,3375269.5558017273 8386621.400058956,3375250.286397872 8386597.108945568,3375207.996123319 8386539.459542238,3375205.1352124056 8386532.125610395,3375187.2684341334 8386484.944156682,3375186.812024221 8386468.965202453,3375185.1978916046 8386395.649137581,3375185.0309123686 8386387.426405253,3375184.752613641 8386378.848105096,3375183.249800516 8386332.534346164,3375181.5466123065 8386320.844834976)
 (1 row)
 ```
+
+### Построение индексов по геометрии
+
+Создадим табилцу buildings:  
+```sql
+create table buildings (
+    Id serial primary key,
+    Path geometry not null
+);
+```
+
+Добавим в неё случайных линий:  
+```sql
+insert into buildings (Path) 
+select ST_GeomFromText(
+	'LINESTRING('
+	|| (random() * 1000000)::text || ' ' || (random() * 1000000)::text
+	|| ',' || (random() * 1000000)::text || ' ' || (random() * 1000000)::text
+	|| ',' || (random() * 1000000)::text || ' ' || (random() * 1000000)::text
+	|| ')'
+) from generate_series(1, 1000000) as geometry;
+```
+
+Запросим число объектов, которые попадают в четверть генерируемого квадрата:  
+```sql
+select count(*) from buildings where 
+st_intersects (
+   buildings.Path,
+   ST_GeomFromText('POLYGON((0 0, 500000 0, 500000 500000 ,0 500000, 0 0))')
+);
+```
+
+Посмотрим на план запроса:  
+```sql
+explain select count(*) from buildings where 
+st_intersects (
+   buildings.Path,
+   ST_GeomFromText('POLYGON((0 0, 500000 0, 500000 500000 ,0 500000, 0 0))')
+);
+```
+
+В консоль выведется:  
+```
+ Finalize Aggregate  (cost=10446815.34..10446815.35 rows=1 width=8)
+   ->  Gather  (cost=10446815.12..10446815.33 rows=2 width=8)
+         Workers Planned: 2
+         ->  Partial Aggregate  (cost=10445815.12..10445815.13 rows=1 width=8)
+               ->  Parallel Seq Scan on buildings  (cost=0.00..10445554.17 rows=104382 width=0)
+                     Filter: st_intersects(path, '01030000000100000005000000000000000000000000000000000000000000000080841E4100000000000000000000000080841E410000000080841E4100000000000000000000000080841E4100000000000000000000000000000000'::geometry)
+ JIT:
+   Functions: 6
+   Options: Inlining true, Optimization true, Expressions true, Deforming true
+(9 rows)
+```
+
+Видим медленный seq scan.  
+
+Построим индекс:  
+```sql
+create index buildings_geom_idx
+  on buildings
+  using gist (Path);
+```
+
+В консоль выведется:  
+```
+ Finalize Aggregate  (cost=2637389.29..2637389.30 rows=1 width=8)
+   ->  Gather  (cost=2637389.08..2637389.29 rows=2 width=8)
+         Workers Planned: 2
+         ->  Partial Aggregate  (cost=2636389.08..2636389.09 rows=1 width=8)
+               ->  Parallel Bitmap Heap Scan on buildings  (cost=11221.80..2636128.12 rows=104382 width=0)
+                     Filter: st_intersects(path, '01030000000100000005000000000000000000000000000000000000000000000080841E4100000000000000000000000080841E410000000080841E4100000000000000000000000080841E4100000000000000000000000000000000'::geometry)
+                     ->  Bitmap Index Scan on buildings_geom_idx  (cost=0.00..11159.17 rows=250518 width=0)
+                           Index Cond: (path && '01030000000100000005000000000000000000000000000000000000000000000080841E4100000000000000000000000080841E410000000080841E4100000000000000000000000080841E4100000000000000000000000000000000'::geometry)
+ JIT:
+   Functions: 7
+   Options: Inlining true, Optimization true, Expressions true, Deforming true
+(11 rows)
+```
+
+Теперь видим использование созданного индекса. Стоимость запроса уменьшилась в 5 раз.  
+
+Попробуем удалить старый индекс и построить индекс через spgist (основанный на QuadTree):  
+
+```sql
+drop index buildings_geom_idx;
+
+create index buildings_geom_spgist_idx
+  on buildings
+  using spgist (Path);
+```
+
+Посмотрим на план запроса:  
+```
+ Finalize Aggregate  (cost=2633109.29..2633109.30 rows=1 width=8)
+   ->  Gather  (cost=2633109.08..2633109.29 rows=2 width=8)
+         Workers Planned: 2
+         ->  Partial Aggregate  (cost=2632109.08..2632109.09 rows=1 width=8)
+               ->  Parallel Bitmap Heap Scan on buildings  (cost=6941.80..2631848.12 rows=104382 width=0)
+                     Filter: st_intersects(path, '01030000000100000005000000000000000000000000000000000000000000000080841E4100000000000000000000000080841E410000000080841E4100000000000000000000000080841E4100000000000000000000000000000000'::geometry)
+                     ->  Bitmap Index Scan on buildings_geom_spgist_idx  (cost=0.00..6879.17 rows=250518 width=0)
+                           Index Cond: (path && '01030000000100000005000000000000000000000000000000000000000000000080841E4100000000000000000000000080841E410000000080841E4100000000000000000000000080841E4100000000000000000000000000000000'::geometry)
+ JIT:
+   Functions: 7
+   Options: Inlining true, Optimization true, Expressions true, Deforming true
+(11 rows)
+```
+
+Общая стоимость лишь немного меньше, но стоимость сканирования именно по индексу меньше почти вдвое.  
